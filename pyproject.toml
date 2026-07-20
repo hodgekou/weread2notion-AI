@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "weread2notion"
+version = "2.0.0"
+description = "Sync a complete WeRead library into the WeRead2Notion Pro template without rewriting its layout."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "malinkang"}]
+dependencies = [
+  "requests",
+  "notion-client",
+  "python-dotenv",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.scripts]
+weread2notion = "weread2notion.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

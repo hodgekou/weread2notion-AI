@@ -1,0 +1,12 @@
+
+*.egg-info/
+*.py[cod]
+.env
+.venv/
+.pytest_cache/
+OUT_FOLDER/
+backups/
+__pycache__/
+build/
+dist/
+scripts/__pycache__/

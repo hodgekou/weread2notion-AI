@@ -1,0 +1,33 @@
+name: weread sync
+
+on:
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "备份并重建全部数据库行"
+        type: boolean
+        default: false
+  schedule:
+    - cron: "0 0 * * *"
+
+jobs:
+  sync:
+    name: Sync
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: WeRead to Notion
+        uses: ./
+        with:
+          weread-api-key: ${{ secrets.WEREAD_API_KEY }}
+          notion-token: ${{ secrets.NOTION_TOKEN }}
+          notion-page: ${{ secrets.NOTION_PAGE }}
+          full: ${{ inputs.full || 'false' }}
+      - name: Upload full-sync backup
+        if: ${{ inputs.full == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: weread2notion-backup
+          path: backups/*.json
+          if-no-files-found: error
