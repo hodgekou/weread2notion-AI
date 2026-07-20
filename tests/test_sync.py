@@ -58,4 +58,4 @@ def test_book_sync_uses_accumulated_reading_time():
     )
     book = next(raw for database, raw in notion.rows if database == "书架")
     assert book["阅读时长"] == 3206
-    assert book["同步版本"] == 3
+    assert book["同步版本"] == 4

@@ -17,7 +17,7 @@ BOOK_ICON = "https://www.notion.so/icons/book_gray.svg"
 TAG_ICON = "https://www.notion.so/icons/tag_gray.svg"
 USER_ICON = "https://www.notion.so/icons/user-circle-filled_gray.svg"
 TARGET_ICON = "https://www.notion.so/icons/target_red.svg"
-SYNC_VERSION = 3
+SYNC_VERSION = 4
 
 
 class Synchronizer:
@@ -304,9 +304,11 @@ class Synchronizer:
                 "同步版本": SYNC_VERSION,
                 "作者": [authors[author]] if author in authors else [],
                 "分类": [categories[name] for name in cat_names if name in categories],
-                "阅读状态": progress_status(progress)
-                if bundle
-                else ("在读" if timestamp else "想读"),
+                # Shelf/update timestamps only prove that an item was added or
+                # changed. They do not prove that the user actually read it.
+                # Apply the same progress-based rule to books, albums and
+                # article collections so untouched items appear under 想读.
+                "阅读状态": progress_status(progress),
                 # /book/getprogress exposes the accumulated text-reading duration
                 # as readingTime (seconds). recordReadingTime is a different metric
                 # and is commonly zero even for books with substantial progress.
