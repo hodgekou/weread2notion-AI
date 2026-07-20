@@ -37,7 +37,14 @@ def progress_status(progress: dict[str, Any]) -> str:
     value = int(progress.get("progress") or 0)
     if value >= 100 or progress.get("finishTime"):
         return "已读"
-    if value > 0 or progress.get("isStartReading") or progress.get("updateTime"):
+    # updateTime may be present for books that were only added to the shelf, so
+    # it must not be treated as evidence that reading has started.
+    if (
+        value > 0
+        or progress.get("isStartReading")
+        or progress.get("readingTime")
+        or progress.get("recordReadingTime")
+    ):
         return "在读"
     return "想读"
 
