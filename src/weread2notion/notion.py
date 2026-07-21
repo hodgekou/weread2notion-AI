@@ -190,6 +190,8 @@ class NotionWorkspace:
         existing = self.find(database, key_name, key_value)
         if existing:
             body: dict[str, Any] = {"properties": properties}
+            if icon:
+                body["icon"] = {"type": "external", "external": {"url": icon}}
             if cover:
                 body["cover"] = {"type": "external", "external": {"url": cover}}
             self.request(f"pages/{existing['id']}", "PATCH", body)
