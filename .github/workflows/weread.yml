@@ -8,7 +8,9 @@ on:
         type: boolean
         default: false
   schedule:
-    - cron: "0 0 * * *"
+    # GitHub Actions schedules use UTC. Avoid the top of the hour, when
+    # scheduled jobs are most likely to be delayed or dropped.
+    - cron: "17 0 * * *" # 每天北京时间 08:17
 
 jobs:
   sync:
