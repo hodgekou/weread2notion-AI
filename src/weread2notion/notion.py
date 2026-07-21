@@ -225,6 +225,58 @@ class NotionWorkspace:
             self.request(f"pages/{row['id']}", "PATCH", {"in_trash": True})
         return len(rows)
 
+    def replace_generated_book_content(
+        self, page_id: str, children: list[dict[str, Any]]
+    ) -> None:
+        """Replace only the generated synced block, preserving user blocks."""
+        marker = "由 WeRead2Notion 自动同步"
+        for block in self.list_children(page_id):
+            if block.get("type") != "synced_block" or not block.get("has_children"):
+                continue
+            nested = self.list_children(block["id"])
+            if not nested or nested[0].get("type") != "paragraph":
+                continue
+            rich_text = (nested[0].get("paragraph") or {}).get("rich_text") or []
+            text = "".join(item.get("plain_text", "") for item in rich_text)
+            if text == marker:
+                self.request(f"blocks/{block['id']}", "DELETE")
+
+        if not children:
+            return
+        response = self.request(
+            f"blocks/{page_id}/children",
+            "PATCH",
+            {
+                "children": [
+                    {
+                        "object": "block",
+                        "type": "synced_block",
+                        "synced_block": {"synced_from": None},
+                    }
+                ]
+            },
+        )
+        container_id = response["results"][0]["id"]
+        marker_block = {
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {
+                "rich_text": [
+                    {
+                        "type": "text",
+                        "text": {"content": marker},
+                        "annotations": {"color": "gray"},
+                    }
+                ]
+            },
+        }
+        for batch in chunks([marker_block, *children], 100):
+            self.request(
+                f"blocks/{container_id}/children",
+                "PATCH",
+                {"children": batch},
+            )
+
     @staticmethod
     def plain_property(prop: dict | None) -> Any:
         if not prop:

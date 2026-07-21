@@ -110,7 +110,22 @@ class WeReadClient:
             base_time = int(datetime(year, 1, 15).timestamp())
             data = self.call("/readdata/detail", mode="annually", baseTime=base_time)
             annual[year] = data
-            for timestamp, seconds in (data.get("dailyReadTimes") or {}).items():
+            daily = data.get("dailyReadTimes") or {}
+            # The current gateway commonly omits dailyReadTimes in annual mode.
+            # annual.readTimes is monthly, so query only the non-empty months to
+            # obtain their day buckets from monthly.readTimes.
+            if not daily:
+                for month_timestamp, month_seconds in (data.get("readTimes") or {}).items():
+                    if not int(month_seconds or 0):
+                        continue
+                    monthly = self.call(
+                        "/readdata/detail",
+                        mode="monthly",
+                        baseTime=int(month_timestamp),
+                    )
+                    month_days = monthly.get("dailyReadTimes") or monthly.get("readTimes") or {}
+                    daily.update(month_days)
+            for timestamp, seconds in daily.items():
                 days[int(timestamp)] = int(seconds or 0)
         return [
             {"timestamp": timestamp, "duration": duration}

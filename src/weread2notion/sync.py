@@ -11,13 +11,14 @@ from .normalize import (
     progress_status,
     shelf_entries,
 )
+from .blocks import get_callout, get_heading, get_table_of_contents
 
 
 BOOK_ICON = "https://www.notion.so/icons/book_gray.svg"
 TAG_ICON = "https://www.notion.so/icons/tag_gray.svg"
 USER_ICON = "https://www.notion.so/icons/user-circle-filled_gray.svg"
 TARGET_ICON = "https://www.notion.so/icons/target_red.svg"
-SYNC_VERSION = 4
+SYNC_VERSION = 5
 
 
 class Synchronizer:
@@ -117,7 +118,25 @@ class Synchronizer:
             self.counts["archived"] = old_count
             existing = {}
 
-        periods = self.sync_periods(days)
+        related_timestamps = []
+        for book_id, entry in entry_by_id.items():
+            bundle = bundles.get(book_id, {})
+            progress = bundle.get("progress") or {}
+            timestamp = (
+                progress.get("updateTime")
+                or entry.get("readUpdateTime")
+                or entry.get("sort")
+            )
+            if timestamp:
+                related_timestamps.append(int(timestamp))
+            for item in [
+                *(bundle.get("highlights") or []),
+                *(bundle.get("reviews") or []),
+            ]:
+                if item.get("createTime"):
+                    related_timestamps.append(int(item["createTime"]))
+
+        periods = self.sync_periods(days, related_timestamps)
 
         authors, categories = self.sync_people_and_categories(
             entry_by_id.values(), bundles
@@ -138,10 +157,23 @@ class Synchronizer:
         )
         return dict(self.counts)
 
-    def sync_periods(self, days: list[dict[str, Any]]) -> dict[str, dict[str, str]]:
+    def sync_periods(
+        self,
+        days: list[dict[str, Any]],
+        related_timestamps: list[int] | None = None,
+    ) -> dict[str, dict[str, str]]:
         maps = {"day": {}, "week": {}, "month": {}, "year": {}}
         durations = defaultdict(int)
-        for row in days:
+        rows_by_timestamp = {
+            int(row["timestamp"]): int(row.get("duration") or 0) for row in days
+        }
+        for timestamp in related_timestamps or []:
+            rows_by_timestamp.setdefault(int(timestamp), 0)
+        period_rows = [
+            {"timestamp": timestamp, "duration": duration}
+            for timestamp, duration in sorted(rows_by_timestamp.items())
+        ]
+        for row in period_rows:
             keys = period_keys(row["timestamp"])
             for kind in maps:
                 durations[(kind, keys[kind])] += int(row["duration"])
@@ -178,7 +210,7 @@ class Synchronizer:
             if kind == "day":
                 timestamp = next(
                     row["timestamp"]
-                    for row in days
+                    for row in period_rows
                     if period_keys(row["timestamp"])["day"] == key
                 )
                 raw["时间戳"] = timestamp
@@ -191,7 +223,7 @@ class Synchronizer:
             )
             maps[kind][key] = page_id
             self.counts[db_names[kind]] += 1
-        for row in days:
+        for row in period_rows:
             keys = period_keys(row["timestamp"])
             day_id = maps["day"][keys["day"]]
             raw = {
@@ -414,6 +446,45 @@ class Synchronizer:
                     "笔记", "reviewId", review.get("reviewId"), raw, TAG_ICON
                 )
                 self.counts["笔记"] += 1
+            self.notion.replace_generated_book_content(
+                page_id, self.book_content_blocks(bundle)
+            )
+
+    @staticmethod
+    def book_content_blocks(bundle: dict[str, Any]) -> list[dict[str, Any]]:
+        chapters = {
+            str(chapter.get("chapterUid")): chapter
+            for chapter in (bundle.get("chapters") or [])
+        }
+        grouped: dict[str, list[tuple[int, dict[str, Any]]]] = defaultdict(list)
+        for mark in bundle.get("highlights") or []:
+            grouped[str(mark.get("chapterUid") or "")].append((0, mark))
+        for review in bundle.get("reviews") or []:
+            grouped[str(review.get("chapterUid") or "")].append((1, review))
+        if not grouped:
+            return []
+
+        def chapter_sort(uid: str) -> tuple[int, str]:
+            chapter = chapters.get(uid) or {}
+            return (int(chapter.get("chapterIdx") or 10**9), uid)
+
+        blocks: list[dict[str, Any]] = [get_table_of_contents()]
+        for uid in sorted(grouped, key=chapter_sort):
+            chapter = chapters.get(uid) or {}
+            title = chapter.get("title") or "其他笔记"
+            blocks.append(get_heading(2, title))
+            for kind, item in sorted(
+                grouped[uid], key=lambda pair: int(pair[1].get("createTime") or 0)
+            ):
+                if kind == 0:
+                    text = item.get("markText") or "划线"
+                    blocks.append(get_callout(text, "〰️"))
+                else:
+                    abstract = item.get("abstract") or ""
+                    content = item.get("content") or ""
+                    text = "\n\n".join(part for part in (abstract, content) if part) or "想法"
+                    blocks.append(get_callout(text, "💭"))
+        return blocks
 
     def sync_reading_records(self, days, periods):
         database = next(

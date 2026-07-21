@@ -58,4 +58,25 @@ def test_book_sync_uses_accumulated_reading_time():
     )
     book = next(raw for database, raw in notion.rows if database == "书架")
     assert book["阅读时长"] == 3206
-    assert book["同步版本"] == 4
+    assert book["同步版本"] == 5
+
+
+def test_periods_include_zero_duration_book_dates():
+    notion = Notion()
+    sync = Synchronizer(None, notion)
+    maps = sync.sync_periods([], [1784563200])
+    assert "2026" in maps["year"]
+    assert "2026-07" in maps["month"]
+
+
+def test_book_content_is_grouped_by_chapter():
+    blocks = Synchronizer.book_content_blocks(
+        {
+            "chapters": [{"chapterUid": 1, "chapterIdx": 1, "title": "第一章"}],
+            "highlights": [{"chapterUid": 1, "markText": "一条划线"}],
+            "reviews": [],
+        }
+    )
+    assert blocks[0]["type"] == "table_of_contents"
+    assert blocks[1]["heading_2"]["rich_text"][0]["text"]["content"] == "第一章"
+    assert blocks[2]["callout"]["rich_text"][0]["text"]["content"] == "一条划线"

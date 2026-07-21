@@ -36,3 +36,17 @@ def test_notebook_pagination_is_flat_and_uses_last_sort():
     assert totals["notes"] == 3
     assert session.payloads[1]["lastSort"] == 20
     assert "params" not in session.payloads[1]
+
+
+def test_reading_days_falls_back_to_monthly_day_buckets():
+    session = Session(
+        [
+            {"totalReadTime": 120},
+            {"readTimes": {"1767196800": 120}, "totalReadTime": 120},
+            {"readTimes": {"1767283200": 120}},
+        ]
+    )
+    client = WeReadClient("key", session=session)
+    days, _ = client.reading_days(2026)
+    assert days == [{"timestamp": 1767283200, "duration": 120}]
+    assert session.payloads[2]["mode"] == "monthly"

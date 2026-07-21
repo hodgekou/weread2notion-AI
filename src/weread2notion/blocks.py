@@ -93,8 +93,9 @@ def get_callout(content, icon=None):
             {
                 "type": "text",
                 "text": {
-                    "content": content,
+                    "content": str(content)[:2000],
                 },
+                "annotations": {"color": "blue"},
             }
         ],
     }
