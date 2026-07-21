@@ -90,6 +90,19 @@ Secret 名称必须完全一致，并注意以下对应关系：
 
 请确认仓库已经同步到最新版本，然后重新运行一次 Actions。同步器会使用微信读书返回的累计阅读时长更新该字段。
 
+## 问题反馈与功能建议
+
+请通过 [GitHub Issues](https://github.com/hodgekou/weread2notion-AI/issues/new/choose) 提交问题或需求。仓库提供了面向维护者和 AI 的 Issue 模板，建议尽可能提供：
+
+- 当前结果与期望结果
+- 可以复现问题的操作步骤
+- 脱敏后的 GitHub Actions 运行链接或日志
+- 相关 Notion 页面、书名和 BookId
+- 使用普通同步还是全量同步
+- 可以判断问题已经解决的验收标准
+
+除问题或需求描述外，其余信息可以留空或填写“不清楚”。请勿提交 `WEREAD_API_KEY`、`NOTION_TOKEN`、Cookie、`.env` 内容或其他敏感信息。
+
 ## 更多文档
 
 - [技术文档与本地运行说明](docs/TECHNICAL.md)
