@@ -76,6 +76,41 @@ def test_book_sync_uses_accumulated_reading_time():
     assert "同步版本" not in book
 
 
+def test_book_period_relations_use_finish_time_not_last_read_time():
+    notion = Notion()
+    sync = Synchronizer(None, notion)
+    finish_time = 1704067200  # 2024-01-01 Asia/Shanghai
+    last_read_time = 1735689600  # 2025-01-01 Asia/Shanghai
+    periods = {
+        "day": {"2024-01-01": "day-2024"},
+        "week": {"2024-01-01": "week-2024"},
+        "month": {"2024-01": "month-2024"},
+        "year": {"2024": "year-2024", "2025": "year-2025"},
+    }
+    sync.sync_books(
+        {"book-1": {"title": "测试书籍"}},
+        {
+            "book-1": {
+                "info": {"title": "测试书籍"},
+                "progress": {
+                    "progress": 100,
+                    "finishTime": finish_time,
+                    "updateTime": last_read_time,
+                },
+            }
+        },
+        {},
+        {},
+        periods,
+        {"book-1"},
+        {},
+    )
+    book = next(raw for database, raw in notion.rows if database == "书架")
+    assert book["阅读完成时间"] == "2024-01-01"
+    assert book["最后阅读时间"] == "2025-01-01"
+    assert book["年"] == ["year-2024"]
+
+
 def test_sync_version_is_marked_only_after_book_content():
     notion = Notion()
     sync = Synchronizer(None, notion)

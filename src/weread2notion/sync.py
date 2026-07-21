@@ -294,7 +294,11 @@ class Synchronizer:
                 or entry.get("readUpdateTime")
                 or entry.get("sort")
             )
-            relations = period_keys(timestamp) if timestamp else {}
+            finish_timestamp = progress.get("finishTime")
+            # Book period relations represent when the book was completed.
+            # The last-read timestamp can change after completion and must not
+            # move a finished book into a different day/month/year.
+            relations = period_keys(finish_timestamp) if finish_timestamp else {}
             chapter_uid = str(progress.get("chapterUid") or "")
             current_chapter = next(
                 (
@@ -355,6 +359,7 @@ class Synchronizer:
                     progress.get("startReadingTime") or progress.get("beginReadingDate")
                 ),
                 "最后阅读时间": iso_date(timestamp),
+                "阅读完成时间": iso_date(finish_timestamp),
                 "时间": iso_date(progress.get("finishTime") or timestamp),
             }
             for kind, prop in (
