@@ -333,7 +333,6 @@ class Synchronizer:
                 "置顶": bool(entry.get("isTop")),
                 "有声书集数": entry.get("trackCount") or 0,
                 "完结状态": entry.get("finishStatus") or "",
-                "同步版本": SYNC_VERSION,
                 "作者": [authors[author]] if author in authors else [],
                 "分类": [categories[name] for name in cat_names if name in categories],
                 # Shelf/update timestamps only prove that an item was added or
@@ -448,6 +447,18 @@ class Synchronizer:
                 self.counts["笔记"] += 1
             self.notion.replace_generated_book_content(
                 page_id, self.book_content_blocks(bundle)
+            )
+            # Mark the book complete only after all related rows and generated
+            # page content have been written. If a run is interrupted before
+            # this point, the next incremental sync will retry the book.
+            self.notion.request(
+                f"pages/{page_id}",
+                "PATCH",
+                {
+                    "properties": self.notion.properties(
+                        "书架", {"同步版本": SYNC_VERSION}
+                    )
+                },
             )
 
     @staticmethod

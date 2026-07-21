@@ -12,16 +12,28 @@ class Notion:
 
     def __init__(self):
         self.rows = []
+        self.requests = []
 
     def upsert(self, database, key_name, key_value, raw, icon, cover=None):
         self.rows.append((database, raw))
         return f"{database}:{key_value}"
 
     def request(self, *args, **kwargs):
+        self.requests.append((args, kwargs))
         return {}
 
     def properties(self, database, raw):
         return raw
+
+    def archive_rows(self, *args, **kwargs):
+        return None
+
+    def create(self, database, raw, icon):
+        self.rows.append((database, raw))
+        return f"{database}:created"
+
+    def replace_generated_book_content(self, page_id, blocks):
+        self.rows.append(("正文", {"page_id": page_id, "blocks": blocks}))
 
 
 def test_period_rows_have_valid_date_ranges():
@@ -58,7 +70,29 @@ def test_book_sync_uses_accumulated_reading_time():
     )
     book = next(raw for database, raw in notion.rows if database == "书架")
     assert book["阅读时长"] == 3206
-    assert book["同步版本"] == 5
+    assert "同步版本" not in book
+
+
+def test_sync_version_is_marked_only_after_book_content():
+    notion = Notion()
+    sync = Synchronizer(None, notion)
+    sync.sync_book_content(
+        {
+            "book-1": {
+                "chapters": [],
+                "highlights": [],
+                "reviews": [],
+            }
+        },
+        {"book-1": "page-1"},
+        {"day": {}, "week": {}, "month": {}, "year": {}},
+    )
+    assert notion.rows[-1] == ("正文", {"page_id": "page-1", "blocks": []})
+    assert notion.requests[-1][0] == (
+        "pages/page-1",
+        "PATCH",
+        {"properties": {"同步版本": 5}},
+    )
 
 
 def test_periods_include_zero_duration_book_dates():
