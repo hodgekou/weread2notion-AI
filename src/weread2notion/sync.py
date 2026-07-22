@@ -34,7 +34,6 @@ class Synchronizer:
             "completed_progress_100": False,
             "delete_removed": True,
             "sync_notes": True,
-            "highlight_sort_mode": 0,
             "start_year": start_year,
             **(preferences or {}),
         }
@@ -498,10 +497,7 @@ class Synchronizer:
             self.counts["正文划线"] += len(bundle.get("highlights") or [])
             self.counts["正文笔记"] += len(bundle.get("reviews") or [])
             self.notion.replace_generated_book_content(
-                page_id,
-                self.book_content_blocks(
-                    bundle, int(self.preferences["highlight_sort_mode"])
-                ),
+                page_id, self.book_content_blocks(bundle)
             )
             # Mark the book complete only after all related rows and generated
             # page content have been written. If a run is interrupted before
@@ -517,9 +513,7 @@ class Synchronizer:
             )
 
     @staticmethod
-    def book_content_blocks(
-        bundle: dict[str, Any], sort_mode: int = 0
-    ) -> list[dict[str, Any]]:
+    def book_content_blocks(bundle: dict[str, Any]) -> list[dict[str, Any]]:
         chapters = {
             str(chapter.get("chapterUid")): chapter
             for chapter in (bundle.get("chapters") or [])
@@ -533,15 +527,6 @@ class Synchronizer:
             return []
 
         def chapter_sort(uid: str) -> tuple[int, str]:
-            if sort_mode == 1:
-                first_mark_time = min(
-                    (
-                        int(item.get("createTime") or 0)
-                        for _, item in grouped[uid]
-                    ),
-                    default=0,
-                )
-                return (first_mark_time, uid)
             chapter = chapters.get(uid) or {}
             return (int(chapter.get("chapterIdx") or 10**9), uid)
 

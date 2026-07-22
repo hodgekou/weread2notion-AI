@@ -332,29 +332,6 @@ def test_book_content_is_grouped_by_chapter():
     assert blocks[2]["callout"]["rich_text"][0]["text"]["content"] == "一条划线"
 
 
-def test_book_content_can_sort_chapters_by_highlight_time():
-    blocks = Synchronizer.book_content_blocks(
-        {
-            "chapters": [
-                {"chapterUid": 1, "chapterIdx": 1, "title": "第一章"},
-                {"chapterUid": 2, "chapterIdx": 2, "title": "第二章"},
-            ],
-            "highlights": [
-                {"chapterUid": 1, "markText": "较晚", "createTime": 200},
-                {"chapterUid": 2, "markText": "较早", "createTime": 100},
-            ],
-            "reviews": [],
-        },
-        sort_mode=1,
-    )
-    headings = [
-        block["heading_2"]["rich_text"][0]["text"]["content"]
-        for block in blocks
-        if block["type"] == "heading_2"
-    ]
-    assert headings == ["第二章", "第一章"]
-
-
 def test_plan_uses_shelf_as_authoritative_source():
     class Weread:
         def shelf(self):

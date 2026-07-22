@@ -133,9 +133,6 @@ class NotionWorkspace:
                             "阅读完成进度强制改为100%": {"checkbox": {}},
                             "只同步我的书架书籍": {"checkbox": {}},
                             "同步划线和笔记": {"checkbox": {}},
-                            "正文划线排序方式": {
-                                "number": {"format": "number"}
-                            },
                             "阅读统计起始年份": {
                                 "number": {"format": "number"}
                             },
@@ -156,25 +153,10 @@ class NotionWorkspace:
                 "阅读完成进度强制改为100%": "checkbox",
                 "只同步我的书架书籍": "checkbox",
                 "同步划线和笔记": "checkbox",
-                "正文划线排序方式": "number",
                 "阅读统计起始年份": "number",
                 "同步配置版本（不可删除）": "number",
             }
             self.titles[SETTINGS_DATABASE] = "配置"
-
-        if "正文划线排序方式" not in self.schemas[SETTINGS_DATABASE]:
-            self.request(
-                f"data_sources/{self.sources[SETTINGS_DATABASE]}",
-                "PATCH",
-                {
-                    "properties": {
-                        "正文划线排序方式": {
-                            "number": {"format": "number"}
-                        }
-                    }
-                },
-            )
-            self.schemas[SETTINGS_DATABASE]["正文划线排序方式"] = "number"
 
         rows = self.query_all(SETTINGS_DATABASE)
         if not rows:
@@ -185,7 +167,6 @@ class NotionWorkspace:
                     "阅读完成进度强制改为100%": False,
                     "只同步我的书架书籍": True,
                     "同步划线和笔记": True,
-                    "正文划线排序方式": 0,
                     "阅读统计起始年份": default_start_year,
                     "同步配置版本（不可删除）": 0,
                 },
@@ -213,15 +194,6 @@ class NotionWorkspace:
                             "bulleted_list_item": {
                                 "rich_text": text_value(
                                     "阅读完成进度强制改为100%：只改变 Notion 展示，不修改微信读书真实进度。"
-                                )
-                            },
-                        },
-                        {
-                            "object": "block",
-                            "type": "bulleted_list_item",
-                            "bulleted_list_item": {
-                                "rich_text": text_value(
-                                    "正文划线排序方式：0 按章节顺序，1 按划线时间。"
                                 )
                             },
                         },
@@ -287,18 +259,14 @@ class NotionWorkspace:
                 compatible_value("只同步我的书架书籍", "移出书架时删除", True)
             ),
             "sync_notes": bool(value("同步划线和笔记", True)),
-            "highlight_sort_mode": int(value("正文划线排序方式", 0)),
             "start_year": int(value("阅读统计起始年份", default_start_year)),
         }
-        if settings["highlight_sort_mode"] not in (0, 1):
-            settings["highlight_sort_mode"] = 0
         config_code = (
             1_000_000
-            + settings["start_year"] * 16
+            + settings["start_year"] * 8
             + int(settings["completed_progress_100"])
             + int(settings["delete_removed"]) * 2
             + int(settings["sync_notes"]) * 4
-            + settings["highlight_sort_mode"] * 8
         )
         config_property = (
             "同步配置版本（不可删除）"
