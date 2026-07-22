@@ -4,6 +4,8 @@
 
 WeRead2Notion AI 可以通过 GitHub Actions，把微信读书数据自动同步到一套可直接 Duplicate 的 Notion 阅读管理模板，无需自己部署服务器。
 
+![WeRead2Notion AI 同步后的 Notion 阅读仪表盘](https://raw.githubusercontent.com/hodgekou/weread2notion-AI/main/asset/notion-dashboard.png)
+
 ## 主要功能
 
 - 同步当前微信读书书架、作者、分类和阅读状态
@@ -30,3 +32,5 @@ WeRead2Notion AI 可以通过 GitHub Actions，把微信读书数据自动同步
 同步器会更新其管理的 Notion 数据库属性、统计记录和书籍正文中的自动同步区域。请不要把需要长期保留的私人内容只写在这些自动管理区域内。
 
 本项目的代码、文档和 Notion 模板适配工作完全由 OpenAI ChatGPT（Codex，GPT-5 系列模型）生成。
+
+**Full Changelog**: https://github.com/hodgekou/weread2notion-AI/commits/v1.0.0
