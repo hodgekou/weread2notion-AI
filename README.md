@@ -166,6 +166,7 @@ WeRead2Notion 会把微信读书作为同步数据的来源。下列内容由同
 - [技术文档与本地运行说明](docs/TECHNICAL.md)
 - [v1.0.0 版本说明](docs/RELEASE_NOTES_v1.0.0.md)
 - [社区发布文案](docs/COMMUNITY_POST.md)
+- [GitHub 仓库发布设置](docs/GITHUB_PUBLISHING.md)
 - [微信读书助手](https://weread.qq.com/r/weread-skills)
 - [提交问题或功能建议](https://github.com/hodgekou/weread2notion-AI/issues/new/choose)
 
