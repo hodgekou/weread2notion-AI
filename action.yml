@@ -1,6 +1,6 @@
-name: weread2notion sync
-description: Preserve a WeRead2Notion Pro dashboard while syncing complete WeRead data.
-author: malinkang
+name: WeRead2Notion AI Sync
+description: Sync your WeRead bookshelf, progress, highlights, notes, and reading statistics to Notion.
+author: hodgekou
 
 inputs:
   weread-api-key:
@@ -10,7 +10,7 @@ inputs:
     description: Notion integration token.
     required: true
   notion-page:
-    description: Root WeRead2Notion Pro page URL or ID.
+    description: Root WeRead2Notion AI page URL or ID.
     required: true
   full:
     description: Back up, archive, and rebuild all database rows.
@@ -45,3 +45,7 @@ runs:
         else
           weread2notion sync
         fi
+
+branding:
+  icon: book-open
+  color: green

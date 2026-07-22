@@ -21,6 +21,14 @@
 
 无需在电脑上长期运行程序。完成一次配置后，GitHub Actions 会每天自动同步。
 
+<p align="center">
+  <a href="https://app.notion.com/p/wph/Template-3a329affe5af800b8581f98b71e948fb">
+    <img src="asset/notion-dashboard.png" alt="WeRead2Notion AI 同步后的 Notion 阅读仪表盘" width="100%">
+  </a>
+</p>
+
+<p align="center"><sub>同步后的 Notion 首页：原生阅读图表、书架状态、统计、分类、作者与设置。</sub></p>
+
 ## 为什么使用它
 
 - **无需服务器**：只需 Notion、GitHub Actions 和微信读书 API Key。
