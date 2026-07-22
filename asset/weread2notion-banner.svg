@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
+  <title id="title">WeRead2Notion AI</title>
+  <desc id="desc">将微信读书书架、划线、笔记和阅读统计自动同步到 Notion</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07c160"/>
+      <stop offset="1" stop-color="#16a06a"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#064d31" flood-opacity=".25"/>
+    </filter>
+  </defs>
+  <rect width="1280" height="640" rx="40" fill="url(#bg)"/>
+  <circle cx="1130" cy="70" r="210" fill="#fff" opacity=".08"/>
+  <circle cx="80" cy="620" r="250" fill="#fff" opacity=".06"/>
+  <g transform="translate(88 82)">
+    <rect width="112" height="112" rx="28" fill="#fff" filter="url(#shadow)"/>
+    <path d="M28 33c0-7 6-13 13-13h30c7 0 13 6 13 13v48c0 4-4 7-8 5L56 76 36 86c-4 2-8-1-8-5V33Z" fill="#07c160"/>
+    <path d="M43 39h27M43 52h27M43 65h18" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+  </g>
+  <text x="232" y="145" fill="#fff" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC',sans-serif" font-size="66" font-weight="750">WeRead2Notion AI</text>
+  <text x="90" y="268" fill="#fff" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC',sans-serif" font-size="36" font-weight="600">微信读书 → Notion，一次配置，每天自动同步</text>
+  <text x="90" y="326" fill="#eafff3" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC',sans-serif" font-size="25">书架 · 阅读状态 · 划线笔记 · 阅读时长 · 原生图表</text>
+  <g font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC',sans-serif" font-size="22" font-weight="600">
+    <g transform="translate(90 405)"><rect width="220" height="64" rx="32" fill="#fff" opacity=".96"/><text x="110" y="41" text-anchor="middle" fill="#087942">GitHub Actions</text></g>
+    <g transform="translate(330 405)"><rect width="210" height="64" rx="32" fill="#fff" opacity=".96"/><text x="105" y="41" text-anchor="middle" fill="#087942">Notion 原生</text></g>
+    <g transform="translate(560 405)"><rect width="210" height="64" rx="32" fill="#fff" opacity=".96"/><text x="105" y="41" text-anchor="middle" fill="#087942">无需服务器</text></g>
+    <g transform="translate(790 405)"><rect width="170" height="64" rx="32" fill="#fff" opacity=".96"/><text x="85" y="41" text-anchor="middle" fill="#087942">开源免费</text></g>
+  </g>
+  <text x="90" y="560" fill="#d9ffea" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="20">github.com/hodgekou/weread2notion-AI</text>
+</svg>

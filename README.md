@@ -1,8 +1,36 @@
+<p align="center">
+  <img src="asset/weread2notion-banner.svg" alt="WeRead2Notion AI" width="100%">
+</p>
+
+<p align="center">
+  <a href="https://github.com/hodgekou/weread2notion-AI/actions/workflows/weread.yml"><img alt="Sync workflow" src="https://github.com/hodgekou/weread2notion-AI/actions/workflows/weread.yml/badge.svg"></a>
+  <a href="https://github.com/hodgekou/weread2notion-AI/tree/v1.0.0"><img alt="Version" src="https://img.shields.io/github/v/tag/hodgekou/weread2notion-AI?label=version"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/hodgekou/weread2notion-AI"></a>
+  <a href="https://github.com/hodgekou/weread2notion-AI/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/hodgekou/weread2notion-AI?style=flat"></a>
+</p>
+
+<p align="center">
+  <a href="https://app.notion.com/p/wph/Template-3a329affe5af800b8581f98b71e948fb">复制 Notion 模板</a> ·
+  <a href="#开始使用">开始使用</a> ·
+  <a href="https://github.com/hodgekou/weread2notion-AI/issues/new/choose">反馈问题</a>
+</p>
+
 # WeRead2Notion AI
 
 将你的微信读书书架、阅读进度、章节、划线、个人想法和阅读统计，自动同步到一套完整的 Notion 阅读管理模板。
 
 无需在电脑上长期运行程序。完成一次配置后，GitHub Actions 会每天自动同步。
+
+## 为什么使用它
+
+- **无需服务器**：只需 Notion、GitHub Actions 和微信读书 API Key。
+- **一次配置，自动运行**：每天定时同步，也支持随时手动触发。
+- **Notion 原生体验**：使用数据库、视图、分组、公式和 Chart，不依赖外部 Embed 服务。
+- **划线直接进入书籍正文**：按章节整理划线和个人想法，不把内容做成大量 Tag。
+- **书架口径清晰**：以微信读书当前书架为权威来源，人工“读完”标记决定已读状态。
+- **安全重建**：全量同步前导出 JSON 备份，再归档旧记录。
+
+如果这个项目帮你省下了配置和维护时间，欢迎点击右上角 **Star**。这会帮助更多有相同需求的人发现它。
 
 ## 开始使用
 
@@ -136,6 +164,8 @@ WeRead2Notion 会把微信读书作为同步数据的来源。下列内容由同
 ## 更多文档
 
 - [技术文档与本地运行说明](docs/TECHNICAL.md)
+- [v1.0.0 版本说明](docs/RELEASE_NOTES_v1.0.0.md)
+- [社区发布文案](docs/COMMUNITY_POST.md)
 - [微信读书助手](https://weread.qq.com/r/weread-skills)
 - [提交问题或功能建议](https://github.com/hodgekou/weread2notion-AI/issues/new/choose)
 
