@@ -3,6 +3,10 @@
 </p>
 
 <p align="center">
+  <img alt="免费开源" src="https://img.shields.io/badge/%E5%85%8D%E8%B4%B9%E5%BC%80%E6%BA%90-Free%20%26%20Open%20Source-brightgreen?style=for-the-badge">
+</p>
+
+<p align="center">
   <a href="https://github.com/hodgekou/weread2notion-AI/actions/workflows/weread.yml"><img alt="Sync workflow" src="https://github.com/hodgekou/weread2notion-AI/actions/workflows/weread.yml/badge.svg"></a>
   <a href="https://github.com/hodgekou/weread2notion-AI/tree/v1.0.0"><img alt="Version" src="https://img.shields.io/github/v/tag/hodgekou/weread2notion-AI?label=version"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/hodgekou/weread2notion-AI"></a>
@@ -17,7 +21,7 @@
 
 # WeRead2Notion AI
 
-将你的微信读书书架、阅读进度、章节、划线、个人想法和阅读统计，自动同步到一套完整的 Notion 阅读管理模板。
+> **永久免费、完整开源。** 将你的微信读书书架、阅读进度、章节、划线、个人想法和阅读统计，自动同步到一套完整的 Notion 阅读管理模板。
 
 无需在电脑上长期运行程序。完成一次配置后，GitHub Actions 会每天自动同步。
 
