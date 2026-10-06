@@ -193,6 +193,10 @@ weread2notion export --format markdown --output weread-export
 
 本项目的代码、文档以及 Notion 模板适配工作完全由 OpenAI ChatGPT（Codex，GPT-5 系列模型）生成。
 
+## 维护状态
+
+当前版本以稳定同步为目标，后续更新优先处理微信读书接口兼容性、Notion 写入可靠性和用户反馈。若更新涉及数据结构或同步规则，会在 Release Notes 中单独说明。
+
 ## License
 
 MIT
