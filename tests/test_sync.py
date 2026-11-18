@@ -1,6 +1,10 @@
-from datetime import date
+from datetime import date, datetime
+from unittest.mock import Mock
+
+import pytest
 
 from weread2notion.sync import Synchronizer
+from weread2notion.weread import WeReadClient, WeReadError
 
 
 class Notion:
@@ -524,6 +528,36 @@ def test_plan_uses_shelf_as_authoritative_source():
     plan = Synchronizer(Weread(), Notion()).plan()
     assert plan["book_ids"] == ["on-shelf"]
     assert [entry["bookId"] for entry in plan["entries"]] == ["on-shelf"]
+
+
+@pytest.mark.parametrize("full", [False, True], ids=["incremental", "full"])
+@pytest.mark.parametrize(
+    "shelf",
+    [
+        {"upgrade_info": {"message": "Update available"}},
+        {"books": [], "albums": None},
+    ],
+    ids=["notice-only", "invalid-albums"],
+)
+def test_invalid_shelf_stops_sync_before_notion(shelf, full, tmp_path):
+    session = Mock()
+    session.post.return_value.json.side_effect = [shelf, {}, {}]
+    weread = WeReadClient("test-key", session=session)
+
+    notion = Mock()
+    notion.book_index.return_value = {"existing-book": {"page_id": "book-page"}}
+    notion.sources = {"书架": "shelf"}
+    notion.query_all.return_value = [{"id": "book-page"}]
+    notion.request.side_effect = AssertionError("sync tried to trash an existing book")
+    notion.backup_and_archive.side_effect = AssertionError(
+        "sync tried to archive the shelf"
+    )
+    sync = Synchronizer(weread, notion, start_year=datetime.now().astimezone().year + 1)
+
+    with pytest.raises(WeReadError, match="/shelf/sync"):
+        sync.run(full=full, backup_dir=tmp_path)
+
+    assert not notion.mock_calls
 
 
 def test_snapshot_setting_can_disable_snapshot_writes():

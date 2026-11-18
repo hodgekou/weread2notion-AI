@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import logging
 import time
 from datetime import datetime
 from typing import Any
 
 import requests
 
+from .config import DEFAULT_WEREAD_SKILL_VERSION
 
+logger = logging.getLogger(__name__)
 GATEWAY_URL = "https://i.weread.qq.com/api/agent/gateway"
 
 
@@ -15,7 +18,9 @@ class WeReadError(RuntimeError):
 
 
 class WeReadClient:
-    def __init__(self, api_key: str, skill_version: str = "1.0.5", session=None):
+    def __init__(
+        self, api_key: str, skill_version: str = DEFAULT_WEREAD_SKILL_VERSION, session=None
+    ):
         self.skill_version = skill_version
         self.session = session or requests.Session()
         self.session.headers.update(
@@ -30,14 +35,19 @@ class WeReadClient:
                 response = self.session.post(GATEWAY_URL, json=payload, timeout=45)
                 response.raise_for_status()
                 data = response.json()
-                if data.get("upgrade_info"):
-                    message = (
-                        data["upgrade_info"].get("message") or data["upgrade_info"]
-                    )
-                    raise WeReadError(f"微信读书技能需要升级：{message}")
                 if data.get("errcode", 0) != 0:
                     raise WeReadError(
                         f"{api_name} 返回 errcode={data.get('errcode')}: {data.get('errmsg', '')}"
+                    )
+                upgrade_info = data.get("upgrade_info")
+                if upgrade_info is not None:
+                    message = (
+                        upgrade_info.get("message")
+                        if isinstance(upgrade_info, dict)
+                        else upgrade_info
+                    )
+                    logger.warning(
+                        "微信读书技能升级提示：%s", message or "请查看微信读书 Skill 文档"
                     )
                 return data
             except WeReadError:
@@ -49,7 +59,32 @@ class WeReadClient:
         raise WeReadError(f"{api_name} 请求失败：{last_error}")
 
     def shelf(self) -> dict[str, Any]:
-        return self.call("/shelf/sync")
+        data = self.call("/shelf/sync")
+        # Missing collections cannot be treated as an empty shelf for sync.
+        books = data.get("books")
+        albums = data.get("albums")
+        if not isinstance(books, list) or not isinstance(albums, list):
+            raise WeReadError("/shelf/sync 回包必须包含 books 和 albums 数组")
+
+        for book in books:
+            book_id = book.get("bookId") if isinstance(book, dict) else None
+            if not isinstance(book_id, str) or not book_id.strip():
+                raise WeReadError("/shelf/sync 回包中的书籍条目缺少有效的 bookId")
+        for album in albums:
+            info = album.get("albumInfo") if isinstance(album, dict) else None
+            album_id = info.get("albumId") if isinstance(info, dict) else None
+            if not (
+                (isinstance(album_id, str) and album_id.strip())
+                or (type(album_id) is int and album_id > 0)
+            ):
+                raise WeReadError(
+                    "/shelf/sync 回包中的专辑条目缺少有效的 albumInfo.albumId"
+                )
+
+        mp = data.get("mp")
+        if mp is not None and not isinstance(mp, dict):
+            raise WeReadError("/shelf/sync 回包中的 mp 必须为对象或 null")
+        return data
 
     def notebooks(self) -> tuple[list[dict[str, Any]], dict[str, int]]:
         rows: list[dict[str, Any]] = []

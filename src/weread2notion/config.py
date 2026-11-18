@@ -12,6 +12,7 @@ ID_RE = re.compile(
     r"([a-f0-9]{32}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})",
     re.IGNORECASE,
 )
+DEFAULT_WEREAD_SKILL_VERSION = "1.0.6"
 
 
 class ConfigError(RuntimeError):
@@ -31,7 +32,7 @@ class Settings:
     notion_token: str
     notion_page_id: str
     notion_version: str = "2026-03-11"
-    skill_version: str = "1.0.5"
+    skill_version: str = DEFAULT_WEREAD_SKILL_VERSION
     start_year: int = 2023
     backup_dir: Path = Path("backups")
     request_interval: float = 0.34
@@ -53,7 +54,7 @@ class Settings:
             notion_token=token,
             notion_page_id=notion_id(page),
             notion_version=os.getenv("NOTION_VERSION", "2026-03-11"),
-            skill_version=os.getenv("WEREAD_SKILL_VERSION", "1.0.5"),
+            skill_version=os.getenv("WEREAD_SKILL_VERSION", DEFAULT_WEREAD_SKILL_VERSION),
             start_year=int(os.getenv("START_YEAR", "2023")),
             backup_dir=Path(os.getenv("BACKUP_DIR", "backups")),
             request_interval=float(os.getenv("NOTION_REQUEST_INTERVAL", "0.34")),
