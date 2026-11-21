@@ -105,21 +105,30 @@ class NotionWorkspace:
         response = getattr(exc, "response", None)
         status = getattr(exc, "status", None) or getattr(response, "status_code", None)
         if status is not None:
-            # 409 is Notion's "conflict while saving, please try again".
-            return status in (409, 429) or status >= 500
-        if not isinstance(exc, (httpx.TransportError, RequestTimeoutError)):
+            # Notion answers 429 (rate limit) and 409 (conflict while saving)
+            # without applying the request, so any request can be repeated.
+            if status in (409, 429):
+                return True
+            if status < 500:
+                return False
+        elif not isinstance(exc, (httpx.TransportError, RequestTimeoutError)):
             return False
-        # The request never reached Notion, so repeating it cannot duplicate
-        # anything.
-        chain = (exc, exc.__cause__, exc.__context__)
-        if any(
-            isinstance(item, (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout))
-            for item in chain
-        ):
-            return True
-        # Otherwise Notion may have applied the request before the connection
-        # dropped. Repeat only requests that give the same result when applied
-        # twice; creating a page or appending blocks again would duplicate data.
+        else:
+            # The request never reached Notion, so repeating it cannot
+            # duplicate anything.
+            chain = (exc, exc.__cause__, exc.__context__)
+            if any(
+                isinstance(
+                    item,
+                    (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout),
+                )
+                for item in chain
+            ):
+                return True
+        # After a 5xx or a dropped connection Notion may already have applied
+        # the request. Repeat only requests that give the same result when
+        # applied twice; creating a page or appending blocks again would
+        # duplicate data.
         method = method.upper()
         return (
             method in {"GET", "DELETE"}
@@ -135,9 +144,9 @@ class NotionWorkspace:
                 query["start_cursor"] = cursor
             response = self.request(f"blocks/{block_id}/children", "GET", query=query)
             rows.extend(response.get("results") or [])
-            cursor = response.get("next_cursor")
-            if not response.get("has_more") or not cursor:
+            if not response.get("has_more"):
                 return rows
+            cursor = self.next_cursor(response, f"blocks/{block_id}/children")
 
     def discover(self) -> "NotionWorkspace":
         def walk(block_id: str) -> None:
@@ -437,9 +446,21 @@ class NotionWorkspace:
                 f"data_sources/{self.sources[database_name]}/query", "POST", body
             )
             rows.extend(response.get("results") or [])
-            cursor = response.get("next_cursor")
-            if not response.get("has_more") or not cursor:
+            if not response.get("has_more"):
                 return rows
+            cursor = self.next_cursor(response, f"{database_name} 数据库查询")
+
+    @staticmethod
+    def next_cursor(response: dict, what: str) -> str:
+        cursor = response.get("next_cursor")
+        if not cursor:
+            # Requesting again without a cursor would loop on the first page,
+            # and treating the first page as everything would make existing
+            # rows look missing and be created a second time. Stop the run.
+            raise RuntimeError(
+                f"Notion 返回了不完整的分页结果（{what}：has_more 为真但缺少 next_cursor）"
+            )
+        return cursor
 
     def property(self, database: str, name: str, value: Any) -> dict | None:
         kind = self.schemas[database].get(name)
@@ -633,12 +654,22 @@ class NotionWorkspace:
                 ]
             },
         }
-        for batch in chunks([marker_block, *children], 100):
-            self.request(
-                f"blocks/{container_id}/children",
-                "PATCH",
-                {"children": batch},
-            )
+        try:
+            for batch in chunks([marker_block, *children], 100):
+                self.request(
+                    f"blocks/{container_id}/children",
+                    "PATCH",
+                    {"children": batch},
+                )
+        except Exception:
+            # Until the first batch lands the new block has no marker, so a
+            # later sync could not recognise it as generated. Remove it now;
+            # the page still holds its previous notes.
+            try:
+                self.request(f"blocks/{container_id}", "DELETE")
+            except Exception as cleanup_error:
+                print(f"未能清理未写完的同步块 {container_id}（{cleanup_error}）")
+            raise
 
     @staticmethod
     def plain_property(prop: dict | None) -> Any:

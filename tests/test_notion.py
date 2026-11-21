@@ -339,12 +339,53 @@ def connect_timeout():
         return exc
 
 
-@pytest.mark.parametrize("status", [409, 429, 500, 502, 503, 504])
-def test_request_retries_transient_statuses(monkeypatch, status):
+CREATE_OR_APPEND = [
+    ("pages", "POST"),
+    ("databases", "POST"),
+    ("blocks/block-1/children", "PATCH"),
+]
+REPEATABLE = [
+    ("blocks/block-1/children", "GET"),
+    ("blocks/block-1", "DELETE"),
+    ("data_sources/source-1/query", "POST"),
+    ("pages/page-1", "PATCH"),
+]
+
+
+@pytest.mark.parametrize("status", [409, 429])
+@pytest.mark.parametrize("path, method", CREATE_OR_APPEND + REPEATABLE)
+def test_rate_limit_and_conflict_are_retried_for_every_request(
+    monkeypatch, status, path, method
+):
+    # Notion did not apply the request, so even a create can be repeated.
     client = ScriptedClient([StatusError(status)])
     notion = workspace(monkeypatch, client)
-    assert notion.request("pages", "POST", {}) == {"ok": True}
+    assert notion.request(path, method, {}) == {"ok": True}
     assert len(client.requests) == 2
+
+
+@pytest.mark.parametrize("status", [500, 502, 503, 504])
+@pytest.mark.parametrize("path, method", REPEATABLE)
+def test_server_errors_are_retried_for_repeatable_requests(
+    monkeypatch, status, path, method
+):
+    client = ScriptedClient([StatusError(status)])
+    notion = workspace(monkeypatch, client)
+    assert notion.request(path, method, {}) == {"ok": True}
+    assert len(client.requests) == 2
+
+
+@pytest.mark.parametrize("status", [500, 502, 503, 504])
+@pytest.mark.parametrize("path, method", CREATE_OR_APPEND)
+def test_server_error_never_repeats_a_create_or_append(
+    monkeypatch, status, path, method
+):
+    # Notion may have created the page or appended the blocks before failing.
+    client = ScriptedClient([StatusError(status)])
+    notion = workspace(monkeypatch, client)
+    with pytest.raises(StatusError):
+        notion.request(path, method, {})
+    assert len(client.requests) == 1
 
 
 @pytest.mark.parametrize("status", [400, 401, 403, 404])
@@ -364,15 +405,7 @@ def test_request_gives_up_after_five_attempts(monkeypatch):
     assert len(client.requests) == 5
 
 
-@pytest.mark.parametrize(
-    "path, method",
-    [
-        ("blocks/block-1/children", "GET"),
-        ("blocks/block-1", "DELETE"),
-        ("data_sources/source-1/query", "POST"),
-        ("pages/page-1", "PATCH"),
-    ],
-)
+@pytest.mark.parametrize("path, method", REPEATABLE)
 def test_dropped_connection_is_retried_for_repeatable_requests(
     monkeypatch, path, method
 ):
@@ -383,10 +416,7 @@ def test_dropped_connection_is_retried_for_repeatable_requests(
         assert len(client.requests) == 2
 
 
-@pytest.mark.parametrize(
-    "path, method",
-    [("pages", "POST"), ("databases", "POST"), ("blocks/block-1/children", "PATCH")],
-)
+@pytest.mark.parametrize("path, method", CREATE_OR_APPEND)
 def test_dropped_connection_never_repeats_a_create_or_append(
     monkeypatch, path, method
 ):
@@ -437,13 +467,26 @@ def test_list_children_paginates_and_survives_a_transient_error(monkeypatch):
 
 
 @pytest.mark.parametrize("method", ["list_children", "query_all"])
-def test_pagination_stops_when_notion_returns_no_cursor(monkeypatch, method):
+def test_incomplete_pagination_is_an_error_not_a_partial_result(monkeypatch, method):
+    # A first page passed off as the whole database would make existing rows
+    # look missing and be created again.
     client = ScriptedClient(response={"results": [{"id": "a"}], "has_more": True})
     notion = workspace(monkeypatch, client)
     notion.sources["书架"] = "source-1"
     target = "block-1" if method == "list_children" else "书架"
-    assert getattr(notion, method)(target) == [{"id": "a"}]
+    with pytest.raises(RuntimeError, match="next_cursor"):
+        getattr(notion, method)(target)
     assert len(client.requests) == 1
+
+
+def test_incomplete_book_index_stops_the_sync_before_any_write(monkeypatch):
+    client = ScriptedClient(response={"results": [], "has_more": True})
+    notion = workspace(monkeypatch, client)
+    notion.sources["书架"] = "source-1"
+    with pytest.raises(RuntimeError, match="next_cursor"):
+        notion.book_index()
+    assert [item["method"] for item in client.requests] == ["POST"]
+    assert client.requests[0]["path"] == "data_sources/source-1/query"
 
 
 MARKER = "由 WeRead2Notion 自动同步"
@@ -507,6 +550,36 @@ def test_generated_content_is_written_before_the_old_block_is_deleted(monkeypatc
 
 def test_old_notes_survive_when_writing_the_new_ones_fails(monkeypatch):
     page = BookPage(fail_on=("PATCH", "blocks/new-block/children"))
+    notion = book_page_workspace(monkeypatch, page)
+
+    with pytest.raises(StatusError):
+        notion.replace_generated_book_content("page-1", [{"type": "callout"}])
+
+    assert ("DELETE", "blocks/old-block") not in page.log
+
+
+def test_unfinished_block_is_removed_when_its_content_cannot_be_written(monkeypatch):
+    # The new block has no marker yet, so no later sync could clean it up.
+    page = BookPage(fail_on=("PATCH", "blocks/new-block/children"))
+    notion = book_page_workspace(monkeypatch, page)
+
+    with pytest.raises(StatusError):
+        notion.replace_generated_book_content("page-1", [{"type": "callout"}])
+
+    assert [item for item in page.log if item[0] == "DELETE"] == [
+        ("DELETE", "blocks/new-block")
+    ]
+
+
+def test_failed_cleanup_still_reports_the_original_error(monkeypatch):
+    class Page(BookPage):
+        def request(self, path, method="GET", body=None, query=None):
+            if (method, path) == ("DELETE", "blocks/new-block"):
+                self.log.append((method, path))
+                raise RuntimeError("cleanup failed")
+            return super().request(path, method, body, query)
+
+    page = Page(fail_on=("PATCH", "blocks/new-block/children"))
     notion = book_page_workspace(monkeypatch, page)
 
     with pytest.raises(StatusError):
