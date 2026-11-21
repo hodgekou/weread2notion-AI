@@ -20,7 +20,7 @@ USER_ICON = "https://www.notion.so/icons/user-circle-filled_gray.svg"
 TAG_ICON = "https://www.notion.so/icons/tag_gray.svg"
 TARGET_ICON = "https://www.notion.so/icons/target_red.svg"
 SNAPSHOT_ICON = "https://www.notion.so/icons/clock_gray.svg"
-SYNC_VERSION = 8
+SYNC_VERSION = 9
 
 
 class Synchronizer:
@@ -682,12 +682,58 @@ class Synchronizer:
             str(chapter.get("chapterUid")): chapter
             for chapter in (bundle.get("chapters") or [])
         }
-        grouped: dict[str, list[tuple[int, dict[str, Any]]]] = defaultdict(list)
+        highlights_by_chapter: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for mark in bundle.get("highlights") or []:
-            grouped[str(mark.get("chapterUid") or "")].append((0, mark))
+            highlights_by_chapter[str(mark.get("chapterUid") or "")].append(mark)
+        highlights = [
+            mark for marks in highlights_by_chapter.values() for mark in marks
+        ]
+        highlight_indexes = {id(mark): index for index, mark in enumerate(highlights)}
+
+        linked_reviews: dict[int, list[dict[str, Any]]] = defaultdict(list)
+        standalone_reviews: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for review in bundle.get("reviews") or []:
-            grouped[str(review.get("chapterUid") or "")].append((1, review))
-        if not grouped:
+            review_chapter = str(review.get("chapterUid") or "")
+            review_range = str(review.get("range") or "").strip()
+            abstract = "".join(str(review.get("abstract") or "").split())
+
+            candidates = [
+                (index, mark)
+                for index, mark in enumerate(highlights)
+                if not review_chapter
+                or str(mark.get("chapterUid") or "") == review_chapter
+            ]
+            range_matches = [
+                index
+                for index, mark in candidates
+                if review_range
+                and str(mark.get("range") or "").strip() == review_range
+            ]
+            text_matches = [
+                index
+                for index, mark in candidates
+                if abstract
+                and abstract
+                == "".join(str(mark.get("markText") or "").split())
+                # Two known but different positions are different passages,
+                # even when the text is identical (a sentence repeated in the
+                # chapter). Only compare text when a position is missing.
+                and not (
+                    review_range
+                    and str(mark.get("range") or "").strip()
+                    not in ("", review_range)
+                )
+            ]
+            # Prefer the source position when it uniquely identifies a mark;
+            # otherwise fall back to the explicit source text in `abstract`.
+            matches = range_matches if len(range_matches) == 1 else text_matches
+            if len(matches) == 1:
+                linked_reviews[matches[0]].append(review)
+            else:
+                standalone_reviews[review_chapter].append(review)
+
+        chapter_uids = set(highlights_by_chapter) | set(standalone_reviews)
+        if not chapter_uids:
             return []
 
         def chapter_sort(uid: str) -> tuple[int, str]:
@@ -695,24 +741,43 @@ class Synchronizer:
             return (int(chapter.get("chapterIdx") or 10**9), uid)
 
         blocks: list[dict[str, Any]] = [get_table_of_contents()]
-        for uid in sorted(grouped, key=chapter_sort):
+        for uid in sorted(chapter_uids, key=chapter_sort):
             chapter = chapters.get(uid) or {}
             title = chapter.get("title") or "其他笔记"
             blocks.append(get_heading(2, title))
-            for kind, item in sorted(
-                grouped[uid], key=lambda pair: int(pair[1].get("createTime") or 0)
-            ):
-                if kind == 0:
-                    text = item.get("markText") or "划线"
-                    blocks.append(get_callout(text, "〰️"))
-                else:
-                    abstract = item.get("abstract") or ""
-                    content = item.get("content") or ""
-                    text = (
-                        "\n\n".join(part for part in (abstract, content) if part)
-                        or "想法"
+            chapter_highlights = sorted(
+                highlights_by_chapter.get(uid, []),
+                key=lambda item: int(item.get("createTime") or 0),
+            )
+            for mark in chapter_highlights:
+                mark_index = highlight_indexes[id(mark)]
+                thought_blocks = []
+                for review in sorted(
+                    linked_reviews.get(mark_index, []),
+                    key=lambda item: int(item.get("createTime") or 0),
+                ):
+                    thought_blocks.append(
+                        get_callout(review.get("content") or "想法", "💭")
                     )
-                    blocks.append(get_callout(text, "💭"))
+                blocks.append(
+                    get_callout(
+                        mark.get("markText") or "划线",
+                        "〰️",
+                        children=thought_blocks,
+                    )
+                )
+
+            for review in sorted(
+                standalone_reviews.get(uid, []),
+                key=lambda item: int(item.get("createTime") or 0),
+            ):
+                abstract = review.get("abstract") or ""
+                content = review.get("content") or ""
+                text = (
+                    "\n\n".join(part for part in (abstract, content) if part)
+                    or "想法"
+                )
+                blocks.append(get_callout(text, "💭"))
         return blocks
 
     def sync_reading_records(self, days, periods, full: bool = False):

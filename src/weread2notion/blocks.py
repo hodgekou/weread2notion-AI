@@ -87,7 +87,7 @@ def get_quote(content):
     }
 
 
-def get_callout(content, icon=None):
+def get_callout(content, icon=None, children=None):
     callout = {
         "rich_text": [
             {
@@ -101,6 +101,8 @@ def get_callout(content, icon=None):
     }
     if icon:
         callout["icon"] = {"type": "emoji", "emoji": icon}
+    if children:
+        callout["children"] = children
     return {
         "type": "callout",
         "callout": callout,
