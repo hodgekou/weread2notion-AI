@@ -715,6 +715,14 @@ class Synchronizer:
                 if abstract
                 and abstract
                 == "".join(str(mark.get("markText") or "").split())
+                # Two known but different positions are different passages,
+                # even when the text is identical (a sentence repeated in the
+                # chapter). Only compare text when a position is missing.
+                and not (
+                    review_range
+                    and str(mark.get("range") or "").strip()
+                    not in ("", review_range)
+                )
             ]
             # Prefer the source position when it uniquely identifies a mark;
             # otherwise fall back to the explicit source text in `abstract`.

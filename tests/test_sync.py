@@ -497,6 +497,53 @@ def test_book_content_does_not_guess_when_highlight_match_is_ambiguous():
     assert standalone_review["callout"]["rich_text"][0]["text"]["content"] == "重复的原文\n\n想法"
 
 
+def test_book_content_does_not_link_by_text_when_ranges_differ():
+    blocks = Synchronizer.book_content_blocks(
+        {
+            "highlights": [
+                {"chapterUid": 1, "range": "10-20", "markText": "重复的原文"},
+            ],
+            "reviews": [
+                {
+                    "chapterUid": 1,
+                    "range": "500-510",
+                    "abstract": "重复的原文",
+                    "content": "对另一处的想法",
+                },
+            ],
+        }
+    )
+
+    mark, standalone_review = blocks[2:]
+    assert "children" not in mark["callout"]
+    assert (
+        standalone_review["callout"]["rich_text"][0]["text"]["content"]
+        == "重复的原文\n\n对另一处的想法"
+    )
+
+
+def test_book_content_links_by_text_when_highlight_has_no_range():
+    blocks = Synchronizer.book_content_blocks(
+        {
+            "highlights": [
+                {"chapterUid": 1, "markText": "一段原文"},
+            ],
+            "reviews": [
+                {
+                    "chapterUid": 1,
+                    "range": "500-510",
+                    "abstract": "一段原文",
+                    "content": "划线想法",
+                },
+            ],
+        }
+    )
+
+    (mark,) = blocks[2:]
+    thought = mark["callout"]["children"][0]
+    assert thought["callout"]["rich_text"][0]["text"]["content"] == "划线想法"
+
+
 def test_daily_snapshot_uses_previous_book_state_for_delta():
     notion = Notion()
     notion.sources["阅读快照"] = "snapshots-source"
