@@ -1,5 +1,8 @@
-from weread2notion.weread import WeReadClient
-from weread2notion.weread import WeReadError
+import logging
+
+import pytest
+
+from weread2notion.weread import WeReadClient, WeReadError
 
 
 class Response:
@@ -24,14 +27,93 @@ class Session:
         return Response(next(self.pages))
 
 
-def test_shelf_request_reports_current_skill_version():
-    session = Session([{"errcode": 0, "books": []}])
-    client = WeReadClient("test-key", session=session)
+@pytest.mark.parametrize(
+    "options, expected_version", [({}, "1.0.6"), ({"skill_version": "1.0.5"}, "1.0.5")]
+)
+def test_shelf_request_reports_skill_version(options, expected_version):
+    session = Session([{"errcode": 0, "books": [], "albums": []}])
+    client = WeReadClient("test-key", session=session, **options)
 
     client.shelf()
 
     assert session.payloads[0]["api_name"] == "/shelf/sync"
-    assert session.payloads[0]["skill_version"] == "1.0.5"
+    assert session.payloads[0]["skill_version"] == expected_version
+
+
+def test_shelf_uses_data_from_response_with_upgrade_notice(caplog):
+    data = {
+        "errcode": 0,
+        "books": [{"bookId": "book-1"}],
+        "albums": [{"albumInfo": {"albumId": "album-1"}}],
+        "upgrade_info": {"message": "Update available"},
+    }
+    session = Session([data])
+    client = WeReadClient("test-key", session=session)
+
+    assert client.shelf() is data
+    assert len(session.payloads) == 1
+    assert any(
+        record.levelno == logging.WARNING and "Update available" in record.getMessage()
+        for record in caplog.records
+    )
+
+
+def test_future_upgrade_notice_keeps_using_the_configured_version():
+    data = {
+        "books": [{"bookId": "book-1"}],
+        "albums": [],
+        "upgrade_info": {"message": "Skill 9.8.0 is available"},
+    }
+    session = Session([data])
+    client = WeReadClient("test-key", skill_version="9.7.0", session=session)
+
+    assert client.shelf() is data
+    assert session.payloads == [{"api_name": "/shelf/sync", "skill_version": "9.7.0"}]
+
+
+def test_gateway_reports_business_error_before_upgrade_notice(caplog):
+    session = Session(
+        [
+            {
+                "errcode": 123,
+                "errmsg": "Example business error",
+                "upgrade_info": {"message": "Update available"},
+            }
+        ]
+    )
+    client = WeReadClient("test-key", session=session)
+
+    with pytest.raises(WeReadError, match="errcode=123: Example business error"):
+        client.shelf()
+
+    assert len(session.payloads) == 1
+    assert not caplog.records
+
+
+@pytest.mark.parametrize(
+    "data, field",
+    [
+        ({"albums": []}, "books"),
+        ({"books": []}, "albums"),
+        ({"books": {}, "albums": []}, "books"),
+        ({"books": [], "albums": None}, "albums"),
+        ({"books": [{"title": "No ID"}], "albums": []}, "bookId"),
+        ({"books": [], "albums": [{"albumInfo": {}}]}, "albumId"),
+        ({"books": [], "albums": [], "mp": []}, "mp"),
+    ],
+)
+def test_shelf_rejects_invalid_response(data, field):
+    client = WeReadClient("test-key", session=Session([data]))
+
+    with pytest.raises(WeReadError, match=rf"/shelf/sync.*{field}"):
+        client.shelf()
+
+
+def test_shelf_accepts_explicitly_empty_lists():
+    data = {"books": [], "albums": [], "mp": None}
+    client = WeReadClient("test-key", session=Session([data]))
+
+    assert client.shelf() is data
 
 
 def test_notebook_pagination_is_flat_and_uses_last_sort():
