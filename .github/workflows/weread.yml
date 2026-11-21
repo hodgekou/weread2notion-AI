@@ -11,6 +11,16 @@ on:
     # GitHub Actions schedules use UTC.
     - cron: "0 20 * * *" # 每天北京时间凌晨 04:00
 
+permissions:
+  contents: read
+
+# Two syncs writing to the same Notion page at once create duplicate rows, and
+# a full rebuild racing a scheduled run can archive rows the other just wrote.
+# Queue runs instead of overlapping or cancelling a half-finished sync.
+concurrency:
+  group: weread-sync
+  cancel-in-progress: false
+
 jobs:
   sync:
     name: Sync
@@ -64,4 +74,6 @@ jobs:
         with:
           name: weread2notion-backup
           path: backups/*.json
-          if-no-files-found: error
+          # A full sync that has to skip unreadable books keeps the existing
+          # rows and writes no backup; that is not a failed run.
+          if-no-files-found: warn
