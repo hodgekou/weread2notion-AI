@@ -183,3 +183,40 @@ def test_book_bundle_reports_progress_failure_before_chapter_lookup():
         assert "接口=/book/getprogress" in str(exc)
     else:
         raise AssertionError("expected progress stage failure")
+
+
+def test_notebook_pagination_stops_when_the_cursor_does_not_advance():
+    page = {"books": [{"sort": 20}], "hasMore": 1}
+    session = Session([page, page, page, page])
+    client = WeReadClient("key", session=session)
+
+    rows, _ = client.notebooks()
+
+    # Without the guard this asks for lastSort=20 until the gateway gives up.
+    assert len(session.payloads) == 2
+    assert len(rows) == 2
+
+
+def test_transport_errors_are_retried_then_reported(monkeypatch):
+    monkeypatch.setattr("weread2notion.weread.time.sleep", lambda _: None)
+
+    class Flaky(Session):
+        def post(self, url, json, timeout):
+            self.payloads.append(json)
+            if len(self.payloads) < 3:
+                raise ConnectionError("connection reset")
+            return Response({"books": [], "albums": []})
+
+    session = Flaky([])
+    assert WeReadClient("key", session=session).shelf() == {"books": [], "albums": []}
+    assert len(session.payloads) == 3
+
+    class Down(Session):
+        def post(self, url, json, timeout):
+            self.payloads.append(json)
+            raise ConnectionError("connection reset")
+
+    session = Down([])
+    with pytest.raises(WeReadError, match="/shelf/sync 请求失败"):
+        WeReadClient("key", session=session).shelf()
+    assert len(session.payloads) == 3

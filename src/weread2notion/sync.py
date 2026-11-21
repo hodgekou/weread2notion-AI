@@ -20,10 +20,13 @@ USER_ICON = "https://www.notion.so/icons/user-circle-filled_gray.svg"
 TAG_ICON = "https://www.notion.so/icons/tag_gray.svg"
 TARGET_ICON = "https://www.notion.so/icons/target_red.svg"
 SNAPSHOT_ICON = "https://www.notion.so/icons/clock_gray.svg"
-SYNC_VERSION = 9
+SYNC_VERSION = 10
 
 
 class Synchronizer:
+    # Consecutive books Notion may refuse before the run is treated as an outage.
+    MAX_CONSECUTIVE_CONTENT_FAILURES = 3
+
     def __init__(
         self,
         weread,
@@ -380,8 +383,13 @@ class Synchronizer:
             {"timestamp": timestamp, "duration": duration}
             for timestamp, duration in sorted(rows_by_timestamp.items())
         ]
-        for row in period_rows:
-            keys = period_keys(row["timestamp"])
+        # Several timestamps (reading time, highlights, thoughts) can fall on
+        # the same day. Resolve each row's periods once and remember the first
+        # timestamp of every day.
+        keyed_rows = [(row, period_keys(row["timestamp"])) for row in period_rows]
+        first_timestamp: dict[str, int] = {}
+        for row, keys in keyed_rows:
+            first_timestamp.setdefault(keys["day"], row["timestamp"])
             for kind in maps:
                 durations[(kind, keys[kind])] += int(row["duration"])
         db_names = {"day": "日", "week": "周", "month": "月", "year": "年"}
@@ -425,12 +433,7 @@ class Synchronizer:
                 "时长（分钟）": duration / 60,
             }
             if kind == "day":
-                timestamp = next(
-                    row["timestamp"]
-                    for row in period_rows
-                    if period_keys(row["timestamp"])["day"] == key
-                )
-                raw["时间戳"] = timestamp
+                raw["时间戳"] = first_timestamp[key]
             database = db_names[kind]
             row = existing[kind].get(key)
             if row:
@@ -462,10 +465,14 @@ class Synchronizer:
                 self.counts[database] += 1
                 changed_periods[kind].add(key)
             maps[kind][key] = page_id
-        for row in period_rows:
-            keys = period_keys(row["timestamp"])
+        linked_days: set[str] = set()
+        for _, keys in keyed_rows:
+            # One relation update per day, however many timestamps it holds.
+            if keys["day"] in linked_days:
+                continue
             if not any(keys[kind] in changed_periods[kind] for kind in maps):
                 continue
+            linked_days.add(keys["day"])
             day_id = maps["day"][keys["day"]]
             raw = {
                 "年": [maps["year"][keys["year"]]],
@@ -531,7 +538,8 @@ class Synchronizer:
                 continue
             bundle = bundles.get(book_id, {})
             info, progress = bundle.get("info", {}), bundle.get("progress", {})
-            author = info.get("author") or entry.get("author") or ""
+            # Author rows are keyed by the stripped name.
+            author = str(info.get("author") or entry.get("author") or "").strip()
             cats = info.get("categories") or []
             cat_names = [(x.get("title") if isinstance(x, dict) else x) for x in cats]
             cat_names += [info.get("category") or entry.get("category")]
@@ -627,6 +635,12 @@ class Synchronizer:
             ):
                 if relations.get(kind) in periods[kind]:
                     raw[prop] = [periods[kind][relations[kind]]]
+            if book_id in bundles:
+                # This write already stores the new Sort value. Reset the
+                # version so the book stays "changed" until sync_book_content
+                # has written its notes; otherwise an interrupted run would
+                # leave the old notes in place and never retry them.
+                raw["同步版本"] = 0
             cover = info.get("cover") or entry.get("cover")
             result[book_id] = self.notion.upsert(
                 "书架",
@@ -641,6 +655,7 @@ class Synchronizer:
         return result
 
     def sync_book_content(self, bundles, books, periods):
+        consecutive_failures = 0
         for book_id, bundle in bundles.items():
             page_id = books.get(book_id)
             if not page_id:
@@ -658,23 +673,40 @@ class Synchronizer:
                 continue
             # Highlights and reviews are rendered directly into the book body.
             # Do not create one Notion page/relation tag per item.
+            try:
+                self.notion.replace_generated_book_content(
+                    page_id, self.book_content_blocks(bundle)
+                )
+                # Mark the book complete only after all related rows and
+                # generated page content have been written. If a run is
+                # interrupted before this point, the next incremental sync
+                # will retry the book.
+                self.notion.request(
+                    f"pages/{page_id}",
+                    "PATCH",
+                    {
+                        "properties": self.notion.properties(
+                            "书架", {"同步版本": SYNC_VERSION}
+                        )
+                    },
+                )
+            except Exception as exc:
+                # One book Notion refuses must not stop the remaining books,
+                # the reading records and the settings from being synced. Its
+                # version is still unmarked, so the next run retries it.
+                consecutive_failures += 1
+                if consecutive_failures >= self.MAX_CONSECUTIVE_CONTENT_FAILURES:
+                    # Several books in a row is an outage or a revoked token,
+                    # not a bad book. Stop instead of failing every book.
+                    raise
+                self.failed_books.append(
+                    {"book_id": str(book_id), "error": f"阶段=写入正文; {exc}"}
+                )
+                print(f"书籍 {book_id} 正文写入失败，下次同步重试（{exc}）")
+                continue
+            consecutive_failures = 0
             self.counts["正文划线"] += len(bundle.get("highlights") or [])
             self.counts["正文笔记"] += len(bundle.get("reviews") or [])
-            self.notion.replace_generated_book_content(
-                page_id, self.book_content_blocks(bundle)
-            )
-            # Mark the book complete only after all related rows and generated
-            # page content have been written. If a run is interrupted before
-            # this point, the next incremental sync will retry the book.
-            self.notion.request(
-                f"pages/{page_id}",
-                "PATCH",
-                {
-                    "properties": self.notion.properties(
-                        "书架", {"同步版本": SYNC_VERSION}
-                    )
-                },
-            )
 
     @staticmethod
     def book_content_blocks(bundle: dict[str, Any]) -> list[dict[str, Any]]:

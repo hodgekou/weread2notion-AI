@@ -1,3 +1,26 @@
+TEXT_LIMIT = 2000
+
+
+def split_text(content, limit=TEXT_LIMIT):
+    """Split text into pieces Notion accepts as one rich-text item each.
+
+    Notion rejects rich-text content longer than 2000 characters. Characters
+    outside the Basic Multilingual Plane (most emoji, rare CJK) are counted as
+    two, so they are measured the same way here.
+    """
+    parts, current, size = [], [], 0
+    for char in "" if content is None else str(content):
+        width = 2 if ord(char) > 0xFFFF else 1
+        if size + width > limit:
+            parts.append("".join(current))
+            current, size = [], 0
+        current.append(char)
+        size += width
+    if current:
+        parts.append("".join(current))
+    return parts or [""]
+
+
 def get_heading(level, content):
     if level == 1:
         heading = "heading_1"
@@ -89,14 +112,14 @@ def get_quote(content):
 
 def get_callout(content, icon=None, children=None):
     callout = {
+        # Long highlights and thoughts are split, never truncated.
         "rich_text": [
             {
                 "type": "text",
-                "text": {
-                    "content": str(content)[:2000],
-                },
+                "text": {"content": part},
                 "annotations": {"color": "blue"},
             }
+            for part in split_text(content)
         ],
     }
     if icon:

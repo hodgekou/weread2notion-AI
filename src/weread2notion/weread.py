@@ -8,6 +8,7 @@ from typing import Any
 import requests
 
 from .config import DEFAULT_WEREAD_SKILL_VERSION
+from .normalize import SHANGHAI
 
 logger = logging.getLogger(__name__)
 GATEWAY_URL = "https://i.weread.qq.com/api/agent/gateway"
@@ -103,7 +104,11 @@ class WeReadClient:
             }
             if not data.get("hasMore") or not batch:
                 break
-            last_sort = batch[-1].get("sort")
+            next_sort = batch[-1].get("sort")
+            # A cursor that does not advance would request the same page forever.
+            if next_sort is None or next_sort == last_sort:
+                break
+            last_sort = next_sort
         return rows, totals
 
     def book_bundle(self, book_id: str) -> dict[str, Any]:
@@ -146,7 +151,8 @@ class WeReadClient:
         self, start_year: int
     ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         overall = self.call("/readdata/detail", mode="overall")
-        current_year = datetime.now().year
+        # CI runs in UTC; WeRead statistics follow Beijing time.
+        current_year = datetime.now(SHANGHAI).year
         days: dict[int, int] = {}
         annual: dict[int, dict[str, Any]] = {}
         for year in range(start_year, current_year + 1):

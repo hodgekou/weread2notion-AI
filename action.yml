@@ -39,9 +39,10 @@ runs:
         WEREAD_API_KEY: ${{ inputs.weread-api-key }}
         NOTION_TOKEN: ${{ inputs.notion-token }}
         NOTION_PAGE: ${{ inputs.notion-page }}
+        FULL_SYNC: ${{ inputs.full }}
       run: |
         summary_file="$RUNNER_TEMP/weread2notion-summary.json"
-        if [ "${{ inputs.full }}" = "true" ]; then
+        if [ "$FULL_SYNC" = "true" ]; then
           weread2notion sync --full --summary-file "$summary_file"
         else
           weread2notion sync --summary-file "$summary_file"

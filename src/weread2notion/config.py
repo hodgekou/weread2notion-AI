@@ -26,6 +26,21 @@ def notion_id(value: str) -> str:
     return match.group(1)
 
 
+def env_value(name: str, default: str) -> str:
+    # CI passes an unset secret or variable as an empty string. Treat that the
+    # same as "not configured" instead of sending Notion an empty version or
+    # failing to parse a number.
+    return (os.getenv(name) or "").strip() or default
+
+
+def env_number(name: str, default: str, kind: type):
+    raw = env_value(name, default)
+    try:
+        return kind(raw)
+    except ValueError as exc:
+        raise ConfigError(f"{name} 必须是数字，当前值：{raw}") from exc
+
+
 @dataclass(frozen=True)
 class Settings:
     weread_api_key: str
@@ -53,9 +68,11 @@ class Settings:
             weread_api_key=api_key,
             notion_token=token,
             notion_page_id=notion_id(page),
-            notion_version=os.getenv("NOTION_VERSION", "2026-03-11"),
-            skill_version=os.getenv("WEREAD_SKILL_VERSION", DEFAULT_WEREAD_SKILL_VERSION),
-            start_year=int(os.getenv("START_YEAR", "2023")),
-            backup_dir=Path(os.getenv("BACKUP_DIR", "backups")),
-            request_interval=float(os.getenv("NOTION_REQUEST_INTERVAL", "0.34")),
+            notion_version=env_value("NOTION_VERSION", "2026-03-11"),
+            skill_version=env_value(
+                "WEREAD_SKILL_VERSION", DEFAULT_WEREAD_SKILL_VERSION
+            ),
+            start_year=env_number("START_YEAR", "2023", int),
+            backup_dir=Path(env_value("BACKUP_DIR", "backups")),
+            request_interval=env_number("NOTION_REQUEST_INTERVAL", "0.34", float),
         )

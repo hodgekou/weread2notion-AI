@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from weread2notion.sync import Synchronizer
+from weread2notion.sync import SYNC_VERSION, Synchronizer
 from weread2notion.weread import WeReadClient, WeReadError
 
 
@@ -147,7 +147,8 @@ def test_book_sync_uses_accumulated_reading_time():
     book = next(raw for database, raw in notion.rows if database == "书架")
     assert book["阅读时长"] == 3206
     assert book["阅读时长（分钟）"] == 3206 / 60
-    assert "同步版本" not in book
+    # The row is written as "notes pending", never as the current version.
+    assert book["同步版本"] == 0
 
 
 def test_book_period_relations_use_finish_time_not_last_read_time():
@@ -247,7 +248,7 @@ def test_sync_version_is_marked_only_after_book_content():
     assert notion.requests[-1][0] == (
         "pages/page-1",
         "PATCH",
-        {"properties": {"同步版本": 9}},
+        {"properties": {"同步版本": 10}},
     )
 
 
@@ -729,3 +730,294 @@ def test_removed_book_and_related_rows_are_moved_to_trash():
         {"in_trash": True},
     )
     assert sync.counts["删除书架"] == 1
+
+
+def test_day_relations_are_written_once_per_day():
+    notion = Notion()
+    sync = Synchronizer(None, notion)
+    day = 1691251200  # 2023-08-06 00:00 Beijing time
+    # Reading time plus 40 highlights and thoughts made on the same day.
+    related = [day + offset * 60 for offset in range(1, 41)]
+
+    sync.sync_periods([{"timestamp": day, "duration": 600}], related, full=True)
+
+    relation_writes = [
+        args for args, _ in notion.requests if args[0] == "pages/日:created"
+    ]
+    assert len(relation_writes) == 1
+    created_day = next(raw for database, raw in notion.rows if database == "日")
+    assert created_day["时间戳"] == day
+    assert created_day["时长"] == 600
+
+
+def test_day_relations_cover_every_new_day():
+    notion = Notion()
+    created = []
+
+    def create(database, raw, icon):
+        created.append((database, raw))
+        return f"{database}:{raw['标题']}"
+
+    notion.create = create
+    sync = Synchronizer(None, notion)
+    first, second = 1691251200, 1691251200 + 86400
+
+    sync.sync_periods(
+        [{"timestamp": first, "duration": 60}, {"timestamp": second, "duration": 120}],
+        [first + 30, second + 30, second + 90],
+    )
+
+    patched = [args[0] for args, _ in notion.requests]
+    assert patched == ["pages/日:2023-08-06", "pages/日:2023-08-07"]
+
+
+class ContentNotion(Notion):
+    """Reject the generated content of selected pages."""
+
+    def __init__(self, rejected=()):
+        super().__init__()
+        self.rejected = set(rejected)
+
+    def replace_generated_book_content(self, page_id, blocks):
+        if page_id in self.rejected:
+            raise RuntimeError("validation_error: body failed validation")
+        super().replace_generated_book_content(page_id, blocks)
+
+
+def test_one_rejected_book_does_not_stop_the_remaining_books():
+    notion = ContentNotion(rejected={"page-1"})
+    sync = Synchronizer(None, notion)
+    bundle = {"chapters": [], "highlights": [{"markText": "划线"}], "reviews": []}
+
+    sync.sync_book_content(
+        {"book-1": bundle, "book-2": bundle},
+        {"book-1": "page-1", "book-2": "page-2"},
+        {"day": {}, "week": {}, "month": {}, "year": {}},
+    )
+
+    assert sync.failed_books == [
+        {
+            "book_id": "book-1",
+            "error": "阶段=写入正文; validation_error: body failed validation",
+        }
+    ]
+    marked = [args[0] for args, _ in notion.requests]
+    # The failed book keeps its "pending" version and is retried next time.
+    assert marked == ["pages/page-2"]
+    assert sync.counts["正文划线"] == 1
+
+
+def test_failed_book_content_is_reported_in_the_run_summary(tmp_path):
+    class WeRead:
+        def shelf(self):
+            return {"books": [{"bookId": "book-1", "sort": 5}], "albums": []}
+
+        def notebooks(self):
+            return ([], {"books": 0, "notes": 0})
+
+        def reading_days(self, start_year):
+            return ([], {"overall": {"totalReadTime": 0}})
+
+        def book_bundle(self, book_id):
+            return {
+                "info": {"title": "测试书籍"},
+                "progress": {},
+                "chapters": [],
+                "highlights": [{"markText": "划线"}],
+                "reviews": [],
+            }
+
+    notion = ContentNotion(rejected={"书架:book-1"})
+    notion.book_index = lambda: {}
+    sync = Synchronizer(WeRead(), notion)
+
+    result = sync.run(backup_dir=tmp_path)
+
+    assert result["failed_book_count"] == 1
+    assert result["failed_books"][0]["book_id"] == "book-1"
+    assert "写入正文" in result["failed_books"][0]["error"]
+
+
+def test_book_row_stays_pending_until_its_notes_are_written():
+    notion = Notion()
+    sync = Synchronizer(None, notion)
+    entries = {
+        "book-1": {"bookId": "book-1", "kind": "book", "sort": 20},
+        "album:1": {"bookId": "album:1", "kind": "album", "sort": 20},
+    }
+
+    sync.sync_books(
+        entries,
+        {"book-1": {"info": {"title": "测试书籍"}, "progress": {}}},
+        {},
+        {},
+        {"day": {}, "week": {}, "month": {}, "year": {}},
+        {"book-1", "album:1"},
+        {
+            "book-1": {"page_id": "page-1", "sort": 10, "sync_version": 8},
+            "album:1": {"page_id": "page-2", "sort": 10},
+        },
+    )
+
+    rows = {raw["BookId"]: raw for database, raw in notion.rows if database == "书架"}
+    # Sort is already stored as 20 here. Without resetting the version, a run
+    # interrupted before the notes are written would look fully synced.
+    assert rows["book-1"]["Sort"] == 20
+    assert rows["book-1"]["同步版本"] == 0
+    assert "同步版本" not in rows["album:1"]
+
+
+def test_interrupted_book_is_selected_again_on_the_next_run(tmp_path):
+    class WeRead:
+        def shelf(self):
+            return {"books": [{"bookId": "book-1", "sort": 20}], "albums": []}
+
+        def notebooks(self):
+            return ([], {"books": 0, "notes": 0})
+
+        def reading_days(self, start_year):
+            return ([], {"overall": {}})
+
+        def book_bundle(self, book_id):
+            fetched.append(book_id)
+            return {"info": {}, "progress": {}, "chapters": [], "highlights": [], "reviews": []}
+
+    fetched = []
+    notion = Notion()
+    # State left behind by a run that stopped after sync_books: the new Sort is
+    # stored, the notes are not, and the version is still "pending".
+    notion.book_index = lambda: {
+        "book-1": {"page_id": "page-1", "sort": 20, "sync_version": 0}
+    }
+
+    Synchronizer(WeRead(), notion).run(backup_dir=tmp_path)
+
+    assert fetched == ["book-1"]
+
+
+def test_author_relation_ignores_surrounding_whitespace():
+    notion = Notion()
+    sync = Synchronizer(None, notion)
+    bundles = {"book-1": {"info": {"author": " 鲁迅 "}, "progress": {}}}
+    entries = {"book-1": {"bookId": "book-1", "kind": "book"}}
+
+    authors, categories = sync.sync_people_and_categories(entries.values(), bundles)
+    sync.sync_books(
+        entries,
+        bundles,
+        authors,
+        categories,
+        {"day": {}, "week": {}, "month": {}, "year": {}},
+        {"book-1"},
+        {},
+    )
+
+    book = next(raw for database, raw in notion.rows if database == "书架")
+    assert list(authors) == ["鲁迅"]
+    assert book["作者"] == [authors["鲁迅"]]
+
+
+def test_long_highlight_is_not_truncated_in_book_content():
+    text = "长" * 5000
+    blocks = Synchronizer.book_content_blocks(
+        {"highlights": [{"chapterUid": 1, "markText": text}]}
+    )
+    rich_text = blocks[2]["callout"]["rich_text"]
+    assert "".join(item["text"]["content"] for item in rich_text) == text
+
+
+def test_repeated_content_failures_abort_instead_of_failing_every_book():
+    pages = {f"book-{index}": f"page-{index}" for index in range(1, 7)}
+    notion = ContentNotion(rejected=set(pages.values()))
+    sync = Synchronizer(None, notion)
+    bundle = {"chapters": [], "highlights": [], "reviews": []}
+
+    with pytest.raises(RuntimeError, match="validation_error"):
+        sync.sync_book_content(
+            {book_id: bundle for book_id in pages},
+            pages,
+            {"day": {}, "week": {}, "month": {}, "year": {}},
+        )
+
+    assert [item["book_id"] for item in sync.failed_books] == ["book-1", "book-2"]
+
+
+def test_scattered_content_failures_do_not_abort():
+    pages = {f"book-{index}": f"page-{index}" for index in range(1, 8)}
+    notion = ContentNotion(rejected={"page-1", "page-2", "page-4", "page-5", "page-7"})
+    sync = Synchronizer(None, notion)
+    bundle = {"chapters": [], "highlights": [], "reviews": []}
+
+    sync.sync_book_content(
+        {book_id: bundle for book_id in pages},
+        pages,
+        {"day": {}, "week": {}, "month": {}, "year": {}},
+    )
+
+    assert len(sync.failed_books) == 5
+
+
+class ShelfWithOneBook:
+    """One e-book whose shelf Sort already equals the value stored in Notion."""
+
+    def __init__(self):
+        self.fetched = []
+
+    def shelf(self):
+        return {"books": [{"bookId": "book-1", "sort": 20}], "albums": []}
+
+    def notebooks(self):
+        return ([], {"books": 0, "notes": 0})
+
+    def reading_days(self, start_year):
+        return ([], {"overall": {}})
+
+    def book_bundle(self, book_id):
+        self.fetched.append(book_id)
+        return {
+            "info": {"title": "测试书籍"},
+            "progress": {},
+            "chapters": [],
+            "highlights": [{"chapterUid": 1, "markText": "划线"}],
+            "reviews": [],
+        }
+
+
+def test_pages_written_by_the_previous_version_are_rebuilt(tmp_path):
+    # A page left by version 9: Sort is current, but its notes may have been
+    # truncated or never finished after an interrupted run.
+    weread = ShelfWithOneBook()
+    notion = Notion()
+    notion.book_index = lambda: {
+        "book-1": {"page_id": "page-1", "sort": 20, "sync_version": 9}
+    }
+
+    Synchronizer(weread, notion).run(backup_dir=tmp_path)
+
+    assert weread.fetched == ["book-1"]
+    content = [raw for database, raw in notion.rows if database == "正文"]
+    assert [item["page_id"] for item in content] == ["page-1"]
+    assert content[0]["blocks"][2]["callout"]["rich_text"][0]["text"]["content"] == "划线"
+    assert notion.requests[-1][0] == (
+        "pages/page-1",
+        "PATCH",
+        {"properties": {"同步版本": SYNC_VERSION}},
+    )
+
+
+def test_pages_at_the_current_version_are_not_fetched_again(tmp_path):
+    weread = ShelfWithOneBook()
+    notion = Notion()
+    notion.book_index = lambda: {
+        "book-1": {"page_id": "page-1", "sort": 20, "sync_version": SYNC_VERSION}
+    }
+
+    Synchronizer(weread, notion).run(backup_dir=tmp_path)
+
+    assert weread.fetched == []
+    assert not [raw for database, raw in notion.rows if database == "正文"]
+
+
+def test_sync_version_was_raised_for_this_release():
+    # Version 9 pages predate the interrupted-run and truncation fixes.
+    assert SYNC_VERSION >= 10
