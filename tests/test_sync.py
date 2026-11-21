@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from weread2notion.sync import Synchronizer
+from weread2notion.sync import SYNC_VERSION, Synchronizer
 from weread2notion.weread import WeReadClient, WeReadError
 
 
@@ -248,7 +248,7 @@ def test_sync_version_is_marked_only_after_book_content():
     assert notion.requests[-1][0] == (
         "pages/page-1",
         "PATCH",
-        {"properties": {"同步版本": 9}},
+        {"properties": {"同步版本": 10}},
     )
 
 
@@ -955,3 +955,69 @@ def test_scattered_content_failures_do_not_abort():
     )
 
     assert len(sync.failed_books) == 5
+
+
+class ShelfWithOneBook:
+    """One e-book whose shelf Sort already equals the value stored in Notion."""
+
+    def __init__(self):
+        self.fetched = []
+
+    def shelf(self):
+        return {"books": [{"bookId": "book-1", "sort": 20}], "albums": []}
+
+    def notebooks(self):
+        return ([], {"books": 0, "notes": 0})
+
+    def reading_days(self, start_year):
+        return ([], {"overall": {}})
+
+    def book_bundle(self, book_id):
+        self.fetched.append(book_id)
+        return {
+            "info": {"title": "测试书籍"},
+            "progress": {},
+            "chapters": [],
+            "highlights": [{"chapterUid": 1, "markText": "划线"}],
+            "reviews": [],
+        }
+
+
+def test_pages_written_by_the_previous_version_are_rebuilt(tmp_path):
+    # A page left by version 9: Sort is current, but its notes may have been
+    # truncated or never finished after an interrupted run.
+    weread = ShelfWithOneBook()
+    notion = Notion()
+    notion.book_index = lambda: {
+        "book-1": {"page_id": "page-1", "sort": 20, "sync_version": 9}
+    }
+
+    Synchronizer(weread, notion).run(backup_dir=tmp_path)
+
+    assert weread.fetched == ["book-1"]
+    content = [raw for database, raw in notion.rows if database == "正文"]
+    assert [item["page_id"] for item in content] == ["page-1"]
+    assert content[0]["blocks"][2]["callout"]["rich_text"][0]["text"]["content"] == "划线"
+    assert notion.requests[-1][0] == (
+        "pages/page-1",
+        "PATCH",
+        {"properties": {"同步版本": SYNC_VERSION}},
+    )
+
+
+def test_pages_at_the_current_version_are_not_fetched_again(tmp_path):
+    weread = ShelfWithOneBook()
+    notion = Notion()
+    notion.book_index = lambda: {
+        "book-1": {"page_id": "page-1", "sort": 20, "sync_version": SYNC_VERSION}
+    }
+
+    Synchronizer(weread, notion).run(backup_dir=tmp_path)
+
+    assert weread.fetched == []
+    assert not [raw for database, raw in notion.rows if database == "正文"]
+
+
+def test_sync_version_was_raised_for_this_release():
+    # Version 9 pages predate the interrupted-run and truncation fixes.
+    assert SYNC_VERSION >= 10

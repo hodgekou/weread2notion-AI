@@ -12,6 +12,7 @@ so users can quickly see what changed without affecting the sync workflow.
 - Keep a book's previous notes when writing the new ones fails, and retry the book on the next sync, including after an interrupted run.
 - Continue with the remaining books when Notion rejects one book's notes; the book is listed in the sync summary.
 - Stop truncating highlights and thoughts longer than 2000 characters.
+- Rebuild every book's notes once on the next sync, so pages left with truncated or unfinished notes by earlier versions are repaired.
 - Update each day's period relations once per day instead of once per highlight, which shortens full rebuilds.
 - Export audiobooks and the article collection from their shelf entry, continue after an unreadable book, and keep both files when two books share a title.
 - Treat blank optional environment variables as unset.
