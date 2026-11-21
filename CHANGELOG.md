@@ -8,6 +8,14 @@ so users can quickly see what changed without affecting the sync workflow.
 ## Unreleased
 
 - Nest a personal thought under its matching highlight when WeRead provides a unique source range or matching source text; keep chapter reviews and ambiguous matches separate.
+- Retry dropped connections to Notion without repeating a request that could create duplicate rows or blocks.
+- Keep a book's previous notes when writing the new ones fails, and retry the book on the next sync, including after an interrupted run.
+- Continue with the remaining books when Notion rejects one book's notes; the book is listed in the sync summary.
+- Stop truncating highlights and thoughts longer than 2000 characters.
+- Update each day's period relations once per day instead of once per highlight, which shortens full rebuilds.
+- Export audiobooks and the article collection from their shelf entry, continue after an unreadable book, and keep both files when two books share a title.
+- Treat blank optional environment variables as unset.
+- Queue overlapping sync workflow runs instead of letting them write to Notion at the same time.
 
 ## v1.0.2 - 2026-08-14
 
