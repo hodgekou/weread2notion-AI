@@ -6,7 +6,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 
+import httpx
 from notion_client import Client
+from notion_client.errors import RequestTimeoutError
+
+from .blocks import split_text
 
 
 REQUIRED_DATABASES = (
@@ -47,11 +51,12 @@ def chunks(values: list[Any], size: int = 100) -> Iterable[list[Any]]:
 
 
 def text_value(value: Any) -> list[dict[str, Any]]:
-    value = "" if value is None else str(value)
-    return [
-        {"type": "text", "text": {"content": value[index : index + 2000]}}
-        for index in range(0, len(value), 2000)
-    ] or [{"type": "text", "text": {"content": ""}}]
+    return [{"type": "text", "text": {"content": part}} for part in split_text(value)]
+
+
+def option_name(value: Any) -> str:
+    # Notion rejects select option names that contain a comma.
+    return str(value).replace(",", "，")
 
 
 class NotionWorkspace:
@@ -73,35 +78,66 @@ class NotionWorkspace:
         self.schemas: dict[str, dict[str, str]] = {}
         self.titles: dict[str, str] = {}
 
-    def request(self, path: str, method: str = "GET", body: dict | None = None) -> dict:
+    def request(
+        self,
+        path: str,
+        method: str = "GET",
+        body: dict | None = None,
+        query: dict | None = None,
+    ) -> dict:
         last_error = None
         for attempt in range(5):
             time.sleep(self.interval if attempt == 0 else min(2**attempt, 8))
             try:
-                return self.client.request(path=path, method=method, body=body)
+                kwargs: dict[str, Any] = {"path": path, "method": method, "body": body}
+                if query:
+                    kwargs["query"] = query
+                return self.client.request(**kwargs)
             except Exception as exc:
                 last_error = exc
-                response = getattr(exc, "response", None)
-                status = getattr(exc, "status", None) or getattr(
-                    response, "status_code", None
-                )
-                # Notion occasionally returns transient 429/5xx responses
-                # during large syncs. Retry those, but surface validation and
-                # permission errors immediately.
-                if status != 429 and (status is None or status < 500):
+                if not self.should_retry(exc, path, method):
                     raise
         raise last_error
+
+    @staticmethod
+    def should_retry(exc: Exception, path: str, method: str) -> bool:
+        """Retry transient failures; surface validation and permission errors."""
+        response = getattr(exc, "response", None)
+        status = getattr(exc, "status", None) or getattr(response, "status_code", None)
+        if status is not None:
+            # 409 is Notion's "conflict while saving, please try again".
+            return status in (409, 429) or status >= 500
+        if not isinstance(exc, (httpx.TransportError, RequestTimeoutError)):
+            return False
+        # The request never reached Notion, so repeating it cannot duplicate
+        # anything.
+        chain = (exc, exc.__cause__, exc.__context__)
+        if any(
+            isinstance(item, (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout))
+            for item in chain
+        ):
+            return True
+        # Otherwise Notion may have applied the request before the connection
+        # dropped. Repeat only requests that give the same result when applied
+        # twice; creating a page or appending blocks again would duplicate data.
+        method = method.upper()
+        return (
+            method in {"GET", "DELETE"}
+            or path.endswith("/query")
+            or (method == "PATCH" and not path.endswith("/children"))
+        )
 
     def list_children(self, block_id: str) -> list[dict[str, Any]]:
         rows, cursor = [], None
         while True:
-            response = self.client.blocks.children.list(
-                block_id=block_id, page_size=100, start_cursor=cursor
-            )
+            query: dict[str, Any] = {"page_size": 100}
+            if cursor:
+                query["start_cursor"] = cursor
+            response = self.request(f"blocks/{block_id}/children", "GET", query=query)
             rows.extend(response.get("results") or [])
-            if not response.get("has_more"):
-                return rows
             cursor = response.get("next_cursor")
+            if not response.get("has_more") or not cursor:
+                return rows
 
     def discover(self) -> "NotionWorkspace":
         def walk(block_id: str) -> None:
@@ -291,6 +327,14 @@ class NotionWorkspace:
             "save_snapshots": bool(value("保存阅读快照", True)),
             "start_year": int(value("阅读统计起始年份", default_start_year)),
         }
+        # A typo in the Notion settings row (0, 20233, ...) must not crash the
+        # sync or fan out into thousands of WeRead requests.
+        if not 2000 <= settings["start_year"] <= datetime.now().year + 1:
+            print(
+                f"阅读统计起始年份 {settings['start_year']} 无效，"
+                f"改用默认值 {default_start_year}"
+            )
+            settings["start_year"] = int(default_start_year)
         config_code = (
             1_000_000
             + settings["start_year"] * 8
@@ -393,9 +437,9 @@ class NotionWorkspace:
                 f"data_sources/{self.sources[database_name]}/query", "POST", body
             )
             rows.extend(response.get("results") or [])
-            if not response.get("has_more"):
-                return rows
             cursor = response.get("next_cursor")
+            if not response.get("has_more") or not cursor:
+                return rows
 
     def property(self, database: str, name: str, value: Any) -> dict | None:
         kind = self.schemas[database].get(name)
@@ -418,10 +462,15 @@ class NotionWorkspace:
         if kind == "relation":
             return {"relation": [{"id": item} for item in (value or [])]}
         if kind in {"select", "status"}:
-            return {kind: {"name": str(value)}} if value else {kind: None}
+            if not value:
+                return {kind: None}
+            name = option_name(value) if kind == "select" else str(value)
+            return {kind: {"name": name}}
         if kind == "multi_select":
             values = value if isinstance(value, (list, tuple, set)) else [value]
-            return {"multi_select": [{"name": str(item)} for item in values if item]}
+            return {
+                "multi_select": [{"name": option_name(item)} for item in values if item]
+            }
         if kind == "checkbox":
             return {"checkbox": bool(value)}
         return None
@@ -534,6 +583,7 @@ class NotionWorkspace:
     ) -> None:
         """Replace only the generated synced block, preserving user blocks."""
         marker = "由 WeRead2Notion 自动同步"
+        stale_ids = []
         for block in self.list_children(page_id):
             if block.get("type") != "synced_block" or not block.get("has_children"):
                 continue
@@ -543,10 +593,19 @@ class NotionWorkspace:
             rich_text = (nested[0].get("paragraph") or {}).get("rich_text") or []
             text = "".join(item.get("plain_text", "") for item in rich_text)
             if text == marker:
-                self.request(f"blocks/{block['id']}", "DELETE")
+                stale_ids.append(block["id"])
 
-        if not children:
-            return
+        # Write the new content before removing the old one. If Notion rejects
+        # or drops a request halfway, the page keeps its previous notes, and the
+        # partial block carries the marker so the next sync cleans it up.
+        if children:
+            self.write_generated_book_content(page_id, marker, children)
+        for block_id in stale_ids:
+            self.request(f"blocks/{block_id}", "DELETE")
+
+    def write_generated_book_content(
+        self, page_id: str, marker: str, children: list[dict[str, Any]]
+    ) -> None:
         response = self.request(
             f"blocks/{page_id}/children",
             "PATCH",
