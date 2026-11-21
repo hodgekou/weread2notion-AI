@@ -247,7 +247,7 @@ def test_sync_version_is_marked_only_after_book_content():
     assert notion.requests[-1][0] == (
         "pages/page-1",
         "PATCH",
-        {"properties": {"同步版本": 8}},
+        {"properties": {"同步版本": 9}},
     )
 
 
@@ -409,6 +409,92 @@ def test_book_content_is_grouped_by_chapter():
     assert blocks[0]["type"] == "table_of_contents"
     assert blocks[1]["heading_2"]["rich_text"][0]["text"]["content"] == "第一章"
     assert blocks[2]["callout"]["rich_text"][0]["text"]["content"] == "一条划线"
+
+
+def test_book_content_nests_thought_under_matching_highlight_by_range():
+    blocks = Synchronizer.book_content_blocks(
+        {
+            "chapters": [{"chapterUid": 1, "chapterIdx": 1, "title": "第一章"}],
+            "highlights": [
+                {
+                    "chapterUid": 1,
+                    "range": "10-20",
+                    "markText": "第一条划线",
+                    "createTime": 1,
+                },
+                {
+                    "chapterUid": 1,
+                    "range": "30-40",
+                    "markText": "第二条划线",
+                    "createTime": 2,
+                },
+            ],
+            "reviews": [
+                {
+                    "chapterUid": 1,
+                    "range": "30-40",
+                    "abstract": "第二条划线",
+                    "content": "这是第二条划线的想法",
+                }
+            ],
+        }
+    )
+
+    first_mark, second_mark = blocks[2:]
+    assert first_mark["callout"]["rich_text"][0]["text"]["content"] == "第一条划线"
+    assert "children" not in first_mark["callout"]
+    assert second_mark["callout"]["rich_text"][0]["text"]["content"] == "第二条划线"
+    thought = second_mark["callout"]["children"][0]
+    assert thought["type"] == "callout"
+    assert thought["callout"]["rich_text"][0]["text"]["content"] == "这是第二条划线的想法"
+
+
+def test_book_content_links_by_abstract_and_keeps_unmatched_reviews_standalone():
+    blocks = Synchronizer.book_content_blocks(
+        {
+            "chapters": [{"chapterUid": 1, "chapterIdx": 1, "title": "第一章"}],
+            "highlights": [
+                {"chapterUid": 1, "markText": "一段 原文"},
+            ],
+            "reviews": [
+                {
+                    "chapterUid": 1,
+                    "abstract": "一段原文",
+                    "content": "划线想法",
+                },
+                {"chapterUid": 1, "content": "章节点评"},
+                {
+                    "chapterUid": 1,
+                    "abstract": "书中另一段原文",
+                    "content": "找不到对应划线的想法",
+                },
+            ],
+        }
+    )
+
+    mark, chapter_review, unmatched_review = blocks[2:]
+    assert mark["callout"]["children"][0]["callout"]["rich_text"][0]["text"]["content"] == "划线想法"
+    assert chapter_review["callout"]["rich_text"][0]["text"]["content"] == "章节点评"
+    assert unmatched_review["callout"]["rich_text"][0]["text"]["content"] == "书中另一段原文\n\n找不到对应划线的想法"
+
+
+def test_book_content_does_not_guess_when_highlight_match_is_ambiguous():
+    blocks = Synchronizer.book_content_blocks(
+        {
+            "highlights": [
+                {"chapterUid": 1, "markText": "重复的原文"},
+                {"chapterUid": 1, "markText": "重复的原文"},
+            ],
+            "reviews": [
+                {"chapterUid": 1, "abstract": "重复的原文", "content": "想法"},
+            ],
+        }
+    )
+
+    first_mark, second_mark, standalone_review = blocks[2:]
+    assert "children" not in first_mark["callout"]
+    assert "children" not in second_mark["callout"]
+    assert standalone_review["callout"]["rich_text"][0]["text"]["content"] == "重复的原文\n\n想法"
 
 
 def test_daily_snapshot_uses_previous_book_state_for_delta():
