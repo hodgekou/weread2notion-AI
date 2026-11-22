@@ -21,6 +21,8 @@
 
 # WeRead2Notion AI
 
+[简体中文](README.md) · [English](README.en.md) · [日本語](README.ja.md) · [WeRead2Notion AI ↗](https://hodgekou.github.io/weread2notion-AI/)
+
 一个免费开源的 **微信读书 → Notion 自动同步**工具。它会把你的书架、阅读状态、阅读时长、章节、划线、个人想法和阅读统计同步到 Notion 原生模板中，并由 GitHub Actions 每天自动运行。
 
 <p align="center">
