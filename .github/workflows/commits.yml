@@ -1,0 +1,55 @@
+name: commits
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: commits-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  attribution:
+    name: No AI co-author trailers
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # A "Co-authored-by" trailer naming an AI assistant makes GitHub list it
+      # as a contributor, and a squash merge copies the trailer from every
+      # commit of the pull request onto main. Reject it before it is merged.
+      - name: Check commit messages
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          set -eu
+          if [ "$EVENT" = "pull_request" ]; then
+            range="$BASE..$HEAD"
+          elif git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            range="$BEFORE..$AFTER"
+          else
+            # First push or a forced update: the previous tip is not available.
+            range="$AFTER~1..$AFTER"
+          fi
+          pattern='^co-authored-by:.*(claude|anthropic|copilot|chatgpt|openai)|noreply@anthropic\.com'
+          failed=0
+          for commit in $(git rev-list "$range"); do
+            if git log -1 --format=%B "$commit" | grep -inE "$pattern"; then
+              echo "::error::Commit $(git log -1 --format='%h %s' "$commit") names an AI assistant as co-author. Remove the trailer from the commit message."
+              failed=1
+            fi
+          done
+          exit "$failed"
