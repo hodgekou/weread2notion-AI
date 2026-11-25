@@ -49,7 +49,15 @@ jobs:
             echo "a relative link still points at a Markdown file"
             exit 1
           fi
-          grep -q 'href="TECHNICAL.html"' _site/guide.html
+          grep -o 'href="[^"]*TECHNICAL[^"]*"' _site/guide.html
+          grep -q 'TECHNICAL\.html"' _site/guide.html || {
+            echo "guide.html does not link to the rendered technical reference"
+            exit 1
+          }
+          cat _site/sitemap.xml
           for page in guide.html guide.en.html guide.ja.html; do
-            grep -q "/weread2notion-AI/$page" _site/sitemap.xml
+            grep -q "/weread2notion-AI/$page<" _site/sitemap.xml || {
+              echo "sitemap.xml does not list $page"
+              exit 1
+            }
           done
