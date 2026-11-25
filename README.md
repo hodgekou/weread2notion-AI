@@ -44,21 +44,7 @@
 
 ## 配置步骤
 
-整个过程不需要服务器，只用到 Notion 和 GitHub。每一步的详细操作、注意事项和排错方法见[完整使用指南](https://hodgekou.github.io/weread2notion-AI/guide.html)。
-
-1. **复制模板**：打开 [WeRead2Notion AI Template](https://app.notion.com/p/wph/Template-3a329affe5af800b8581f98b71e948fb)，点击右上角 **Duplicate**，复制到自己的 Notion Workspace。
-2. **创建 Integration 并连接页面**：在 [Notion Integrations](https://www.notion.so/profile/integrations) 新建 Integration，启用 `Read content`、`Insert content`、`Update content`；回到复制出的最外层页面，在 `••• → Connections` 中添加它。
-3. **Fork 本仓库**，在自己的 Fork 中打开 `Settings → Secrets and variables → Actions`，添加下表三个 Repository secrets。
-4. **手动运行一次**：打开 Fork 的 **Actions → weread sync → Run workflow**，首次不勾选 `full`。完成后在 job 的 **Summary** 查看同步数量，再刷新 Notion。
-5. 之后每天 **北京时间 04:00** 自动同步，也可以随时手动运行。
-
-| Secret | 内容 |
-| --- | --- |
-| `WEREAD_API_KEY` | 微信读书 Gateway API Key，可从 [微信读书助手](https://weread.qq.com/r/weread-skills) 获取 |
-| `NOTION_TOKEN` | 第 2 步创建的 Notion Integration Secret |
-| `NOTION_PAGE` | 第 1 步复制出的新页面完整 URL（不要填公共模板链接） |
-
-不要把 Token、API Key、Cookie 或 `.env` 内容提交到 GitHub。
+整个过程不需要服务器，只用到 Notion 和 GitHub。完整步骤见[使用指南](https://hodgekou.github.io/weread2notion-AI/guide.html)。
 
 ## 更多文档
 
