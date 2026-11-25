@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
   - name: 使用指南
-    url: https://github.com/hodgekou/weread2notion-AI#readme
+    url: https://hodgekou.github.io/weread2notion-AI/guide.html
     about: 提交 Issue 前可先检查安装、授权和 Secrets 配置步骤

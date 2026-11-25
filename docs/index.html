@@ -4,13 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="把微信读书书架、划线、想法与阅读统计每天同步到 Notion。复制模板，在自己的 GitHub 仓库中开始。">
+  <link rel="canonical" href="https://hodgekou.github.io/weread2notion-AI/">
+  <link rel="sitemap" type="application/xml" href="sitemap.xml">
   <title>WeRead2Notion AI · 微信读书同步到 Notion</title>
   <link rel="stylesheet" href="site.css">
 </head>
 <body>
   <header>
     <a class="brand" href="./">WeRead2Notion <small>AI</small></a>
-    <a href="https://github.com/hodgekou/weread2notion-AI">GitHub ↗</a>
+    <a href="https://github.com/hodgekou/weread2notion-AI">GitHub</a>
   </header>
   <main>
     <section class="intro">
@@ -18,8 +20,8 @@
         <h1>把微信读书的书架<br>带进 <em>Notion。</em></h1>
         <p>翻过的书、划过的句子、随手写下的想法，每天自动整理到自己的 Notion 阅读空间。</p>
         <div class="actions">
-          <a class="button" href="https://github.com/hodgekou/weread2notion-AI#配置步骤">开始配置 →</a>
-          <a href="https://app.notion.com/p/wph/Template-3a329affe5af800b8581f98b71e948fb">查看 Notion 模板 ↗</a>
+          <a class="button" href="guide.html">开始配置</a>
+          <a href="https://app.notion.com/p/wph/Template-3a329affe5af800b8581f98b71e948fb">查看 Notion 模板</a>
         </div>
       </div>
       <figure>
@@ -34,13 +36,23 @@
       <article><h2>看见阅读的积累</h2><p>从每日快照查看读到了哪一章，用 Notion 原生图表回顾每周、每月和每年的阅读记录。</p></article>
       <article><h2>每天自动同步</h2><p>复制模板，在自己的 GitHub Fork 配置三个 Secrets。GitHub Actions 默认每天北京时间凌晨四点更新书架。</p></article>
     </section>
+    <section class="library" aria-labelledby="library-title">
+      <h2 id="library-title">文档中心</h2>
+      <dl>
+        <dt><a href="guide.html">使用指南与常见问题</a></dt><dd>从复制模板到首次同步，查看配置步骤、个性化设置和排错方法。</dd>
+        <dt><a href="TECHNICAL.html">技术参考</a></dt><dd>查阅模板结构、环境变量、命令行参数和开发说明。</dd>
+        <dt><a href="RELEASE_NOTES_v1.0.0.html">v1.0.0 发布说明</a></dt><dd>了解首个版本支持的同步内容。</dd>
+      </dl>
+    </section>
   </main>
   <footer>
     <span>WeRead2Notion AI · MIT</span>
     <nav aria-label="配置指南语言">
-      <a href="https://github.com/hodgekou/weread2notion-AI/blob/main/README.md">中文指南</a>
-      <a lang="en" href="https://github.com/hodgekou/weread2notion-AI/blob/main/README.en.md">English guide</a>
-      <a lang="ja" href="https://github.com/hodgekou/weread2notion-AI/blob/main/README.ja.md">日本語ガイド</a>
+      <a href="guide.html">中文指南</a>
+      <a lang="en" href="guide.en.html">English guide</a>
+      <a lang="ja" href="guide.ja.html">日本語ガイド</a>
+      <a href="llms.txt">Markdown 索引</a>
+      <a href="sitemap.xml">站点地图</a>
     </nav>
   </footer>
 </body>

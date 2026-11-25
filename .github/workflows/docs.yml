@@ -1,0 +1,55 @@
+name: docs
+
+on:
+  push:
+    branches: [main]
+    paths: ["docs/**", ".github/workflows/docs.yml"]
+  pull_request:
+    branches: [main]
+    paths: ["docs/**", ".github/workflows/docs.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build site
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # GitHub Pages publishes main:/docs with this same Jekyll build. Run it
+      # here so a broken layout or config fails the pull request instead of
+      # leaving the published site on its previous version.
+      - name: Build with the GitHub Pages Jekyll image
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./docs
+          destination: ./_site
+
+      - name: Check the published pages
+        run: |
+          set -eu
+          for page in index.html guide.html guide.en.html guide.ja.html \
+            TECHNICAL.html RELEASE_NOTES_v1.0.0.html sitemap.xml llms.txt site.css; do
+            test -s "_site/$page" || { echo "missing: $page"; exit 1; }
+          done
+          # Internal notes must stay out of the published site.
+          for page in COMMUNITY_POST.html GITHUB_PUBLISHING.html; do
+            test ! -e "_site/$page" || { echo "should not be published: $page"; exit 1; }
+          done
+          # Links between Markdown files must point at the rendered pages.
+          if grep -rnE 'href="[^":]*\.md(#[^"]*)?"' _site --include='*.html'; then
+            echo "a relative link still points at a Markdown file"
+            exit 1
+          fi
+          grep -q 'href="TECHNICAL.html"' _site/guide.html
+          for page in guide.html guide.en.html guide.ja.html; do
+            grep -q "/weread2notion-AI/$page" _site/sitemap.xml
+          done

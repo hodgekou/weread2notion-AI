@@ -32,3 +32,14 @@ footer { margin-top: 3rem; border-top: 1px solid #bcc8b9; font-size: .9rem; }
   .intro, .features { grid-template-columns: 1fr; gap: 2rem; }
   .features { gap: 1rem; }
 }
+.library { margin-top: 3rem; }
+.library dl { max-width: 52rem; }
+.library dt { font-weight: bold; margin-top: 1.25rem; }
+.library dd { margin: .35rem 0; color: #42574d; }
+.guide { max-width: 52rem; margin: 3rem auto; line-height: 1.8; overflow-wrap: anywhere; }
+.guide h1 { font-size: clamp(2rem, 5vw, 3.25rem); }
+.guide h2 { margin-top: 2.5rem; border-bottom: 1px solid #bcc8b9; }
+.guide pre, .guide table { overflow-x: auto; }
+.guide pre { padding: 1rem; background: #e8eee5; }
+.guide table { display: block; border-collapse: collapse; }
+.guide th, .guide td { padding: .4rem .65rem; border: 1px solid #bcc8b9; text-align: start; }

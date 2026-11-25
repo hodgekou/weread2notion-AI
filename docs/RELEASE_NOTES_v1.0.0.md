@@ -1,3 +1,10 @@
+---
+layout: guide
+lang: zh-CN
+title: v1.0.0 发布说明
+description: WeRead2Notion AI 首个版本的功能与配置说明。
+---
+
 # WeRead2Notion AI v1.0.0
 
 首个稳定版本现已发布。
@@ -25,7 +32,7 @@ WeRead2Notion AI 可以通过 GitHub Actions，把微信读书数据自动同步
 4. 配置 `WEREAD_API_KEY`、`NOTION_TOKEN`、`NOTION_PAGE` 三个 Actions Secrets。
 5. 手动运行一次 `weread sync`，之后等待每日自动同步。
 
-完整步骤请查看项目 [README](../README.md)。
+完整步骤请查看项目 [使用指南](https://hodgekou.github.io/weread2notion-AI/guide.html)。
 
 ## 注意事项
 
@@ -33,4 +40,4 @@ WeRead2Notion AI 可以通过 GitHub Actions，把微信读书数据自动同步
 
 本项目的代码、文档和 Notion 模板适配工作完全由 OpenAI ChatGPT（Codex，GPT-5 系列模型）生成。
 
-**Full Changelog**: https://github.com/hodgekou/weread2notion-AI/commits/v1.0.0
+**Full Changelog**: <https://github.com/hodgekou/weread2notion-AI/commits/v1.0.0>
