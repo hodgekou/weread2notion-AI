@@ -1,0 +1,8 @@
+title: WeRead2Notion AI
+url: https://hodgekou.github.io
+baseurl: /weread2notion-AI
+plugins:
+  - jekyll-relative-links
+exclude:
+  - COMMUNITY_POST.md
+  - GITHUB_PUBLISHING.md

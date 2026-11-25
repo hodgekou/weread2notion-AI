@@ -7,7 +7,7 @@
 进入仓库首页右侧 `About → Edit repository details`：
 
 - Description：`微信读书 → Notion 自动同步：书架、进度、时长、划线、笔记与原生统计图表，无需服务器。`
-- Website：`https://app.notion.com/p/wph/Template-3a329affe5af800b8581f98b71e948fb`
+- Website：`https://hodgekou.github.io/weread2notion-AI/`
 
 推荐 Topics：
 
@@ -27,7 +27,7 @@
 
 - Tag：`v1.0.0`
 - Title：`WeRead2Notion AI v1.0.0`
-- Description：复制 [`RELEASE_NOTES_v1.0.0.md`](RELEASE_NOTES_v1.0.0.md) 内容
+- Description：复制 [`RELEASE_NOTES_v1.0.0.md`](RELEASE_NOTES_v1.0.0.md) 的正文，不要包含文件开头两行 `---` 之间的页面头信息
 - 勾选 `Set as the latest release`
 
 ## 可选：开启 Discussions

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="{{ page.lang | escape }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ page.title | escape }} · {{ site.title | escape }}</title>
+  <meta name="description" content="{{ page.description | escape }}">
+  <link rel="canonical" href="{{ page.url | absolute_url }}">
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+  <header>
+    <a class="brand" href="./">WeRead2Notion <small>AI</small></a>
+    <nav aria-label="Language">
+      <a href="guide.html" lang="zh-CN">中文指南</a>
+      <a href="guide.en.html" lang="en">English guide</a>
+      <a href="guide.ja.html" lang="ja">日本語ガイド</a>
+    </nav>
+  </header>
+  <main class="guide">{{ content }}</main>
+  <footer><a href="./">WeRead2Notion AI</a><a href="https://github.com/hodgekou/weread2notion-AI/blob/main/docs/{{ page.path | split: '/' | last | escape }}">Markdown</a></footer>
+</body>
+</html>

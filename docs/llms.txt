@@ -1,0 +1,11 @@
+# WeRead2Notion AI
+
+> 将微信读书的书架、划线、想法和阅读统计同步到 Notion 的开源工具。
+
+## Documentation
+
+- [中文使用指南](https://raw.githubusercontent.com/hodgekou/weread2notion-AI/main/docs/guide.md) — 首次配置、同步设置与常见问题。
+- [English guide](https://raw.githubusercontent.com/hodgekou/weread2notion-AI/main/docs/guide.en.md)
+- [日本語ガイド](https://raw.githubusercontent.com/hodgekou/weread2notion-AI/main/docs/guide.ja.md)
+- [技术参考](https://raw.githubusercontent.com/hodgekou/weread2notion-AI/main/docs/TECHNICAL.md) — 模板、CLI、环境变量与开发。
+- [v1.0.0 发布说明](https://raw.githubusercontent.com/hodgekou/weread2notion-AI/main/docs/RELEASE_NOTES_v1.0.0.md)

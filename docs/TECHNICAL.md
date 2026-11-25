@@ -1,8 +1,15 @@
+---
+layout: guide
+lang: zh-CN
+title: 技术参考
+description: 模板数据库、本地配置、CLI 命令和开发说明。
+---
+
 # WeRead2Notion AI 技术文档
 
 将微信读书的书架、阅读进度、章节、划线、个人想法和阅读统计同步到 WeRead2Notion AI 模板，同时保留 Notion 页面原有的分栏、目录、视图、公式和样式。
 
-[返回用户使用指南](../README.md)
+[返回用户使用指南](guide.md)
 
 ## 设计原则
 

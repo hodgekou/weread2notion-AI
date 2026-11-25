@@ -30,7 +30,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/hodgekou/weread2notion-AI"
-Documentation = "https://github.com/hodgekou/weread2notion-AI#readme"
+Documentation = "https://hodgekou.github.io/weread2notion-AI/guide.html"
 Issues = "https://github.com/hodgekou/weread2notion-AI/issues"
 Template = "https://app.notion.com/p/wph/Template-3a329affe5af800b8581f98b71e948fb"
 
