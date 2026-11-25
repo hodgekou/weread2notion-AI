@@ -36,6 +36,8 @@ footer { margin-top: 3rem; border-top: 1px solid #bcc8b9; font-size: .9rem; }
 .library dl { max-width: 52rem; }
 .library dt { font-weight: bold; margin-top: 1.25rem; }
 .library dd { margin: .35rem 0; color: #42574d; }
+/* Long-form pages read on plain white; the landing page keeps its tint. */
+.guide-page { background: #fff; }
 .guide { max-width: 52rem; margin: 3rem auto; line-height: 1.8; overflow-wrap: anywhere; }
 .guide h1 { font-size: clamp(2rem, 5vw, 3.25rem); }
 .guide h2 { margin-top: 2.5rem; border-bottom: 1px solid #bcc8b9; }
